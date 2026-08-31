@@ -45,8 +45,23 @@ TICK_DT = 1.0 / TICK_HZ
 
 
 class KadiServer:
-    def __init__(self, port: int = DEFAULT_PORT, leaderboard_path: Optional[str] = None):
-        self.conns = ConnectionManager(port=port)
+    def __init__(self, port: int = DEFAULT_PORT, ws_port: Optional[int] = None,
+                 leaderboard_path: Optional[str] = None):
+        # ws_port=None means "auto: port + 1000" so every existing
+        # call site that only ever varied `port` -- including this
+        # project's own test suite, which follows a PORT / PORT+1 /
+        # PORT+2 convention for running several KadiServer instances
+        # in one file to avoid collisions -- keeps working unchanged:
+        # +1000 sits comfortably clear of that small-offset convention
+        # rather than colliding with it (an earlier +1 default did
+        # exactly that and broke test_internet_phase1_lobby.py).
+        # Pass ws_port=0 explicitly to disable the WS listener
+        # entirely (e.g. a LAN-only deployment).
+        if ws_port is None:
+            ws_port = port + 1000
+        elif ws_port == 0:
+            ws_port = None
+        self.conns = ConnectionManager(port=port, ws_port=ws_port)
         self.lobby = Lobby()
         # Same directory this module lives in by default -- this is a
         # standalone, always-on server process (see this module's own
@@ -67,7 +82,8 @@ class KadiServer:
 
     def run_forever(self):
         self.start()
-        print(f"KADI Internet Multiplayer server listening on port {self.conns.port} "
+        ws_note = f", WebSocket on port {self.conns.ws_port}" if self.conns.ws_port else " (WebSocket listener disabled)"
+        print(f"KADI Internet Multiplayer server listening on port {self.conns.port}{ws_note} "
               f"(Ctrl+C to stop)")
         try:
             while True:
@@ -336,11 +352,16 @@ def main():
     parser = argparse.ArgumentParser(description="KADI Internet Multiplayer server")
     parser.add_argument('--port', type=int, default=DEFAULT_PORT,
                         help=f"TCP port to listen on (default {DEFAULT_PORT})")
+    parser.add_argument('--ws-port', type=int, default=None,
+                        help="WebSocket port for browser-based clients "
+                             "(Discord/Telegram/WeChat/web-pwa) to listen on. "
+                             "Default: --port + 1. Pass 0 to disable the WS "
+                             "listener entirely (e.g. a LAN-only deployment).")
     parser.add_argument('--leaderboard-path', type=str, default=None,
                         help="Path to the global leaderboard JSON file "
                              "(default: leaderboard.json next to this script)")
     args = parser.parse_args()
-    server = KadiServer(port=args.port, leaderboard_path=args.leaderboard_path)
+    server = KadiServer(port=args.port, ws_port=args.ws_port, leaderboard_path=args.leaderboard_path)
     server.run_forever()
 
 
