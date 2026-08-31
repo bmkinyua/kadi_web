@@ -1,0 +1,511 @@
+name: Build KADI (Windows / Mac / Linux x86_64 / Linux ARM64)
+
+# Builds four desktop targets from ONE workflow run, using GitHub's own
+# hosted machines — this is specifically how a Mac build gets produced
+# without anyone on the team owning a Mac, and how an ARM64 Linux build
+# gets produced without anyone owning ARM64 hardware either. PyInstaller
+# itself can't cross-compile — not across OS, and not across CPU
+# architecture either (an x86_64 Linux binary will not run on ARM64
+# Linux, full stop) — so this workflow's whole job is running the SAME
+# build steps four times, once per hosted OS/architecture, in parallel.
+#
+# Triggers:
+#   - Automatically on any push of a version tag (e.g. `git tag v1.2 &&
+#     git push --tags`) — the intended way to cut a real release.
+#   - Manually any time via the "Run workflow" button on the Actions
+#     tab (workflow_dispatch) — useful for testing this workflow itself
+#     without needing to push a new tag every time.
+#
+# Where the output goes: each target's build is uploaded as a
+# downloadable "artifact" on the Actions run's summary page — go to the
+# repo's Actions tab, click the run, and the four builds (KADI-windows,
+# KADI-mac, KADI-linux, KADI-linux-arm64) are listed at the bottom as
+# zip downloads.
+#
+# IMPORTANT — what this workflow does NOT do:
+#   - Does not sign or notarize the Mac build. Without that, macOS's
+#     Gatekeeper will block it with an "unidentified developer" warning
+#     for anyone who downloads it — that requires an Apple Developer
+#     Program membership (paid, $99/yr) and is a separate, later step;
+#     see the Part B distribution discussion for why that's flagged as
+#     something only the project owner can set up.
+#   - Does not code-sign the Windows build either (would remove the
+#     SmartScreen warning, lower priority, costs money, not blocking).
+#   - Does not upload to itch.io automatically — that's a distinct next
+#     step (itch's `butler` CLI), not part of this workflow.
+#
+# A NOTE ON BACKWARD COMPATIBILITY (read this before changing OS/
+# container versions below): PyInstaller's Linux AND macOS builds both
+# link against the SYSTEM'S OWN C library at build time (glibc on
+# Linux, an equivalent on macOS) — and that link is FORWARD-compatible
+# only, never backward. A binary built on a newer OS/libc version will
+# refuse to run on an older one, but happily runs on anything newer.
+# This is exactly what caused two real, confirmed failures on real
+# target machines: a build made on ubuntu-24.04-arm (glibc 2.39)
+# refused to run on a target with glibc 2.35 ("GLIBC_2.38 not found"),
+# and — after fixing THAT — a build made on ubuntu-22.04 (glibc 2.35)
+# STILL refused to run on real target machines (both x86_64 and ARM64)
+# that turned out to only have glibc 2.31 (Ubuntu 20.04, confirmed via
+# `ldd --version` on both). The fix, and the reason for everything
+# below: always build on the OLDEST glibc you actually want to
+# support, never the newest available.
+#
+# ONE MORE WRINKLE, not just "pin runs-on to an older label": GitHub
+# retired the ubuntu-20.04 hosted runner entirely in April 2025 — it's
+# simply not selectable anymore, at any glibc version, via the plain
+# `runs-on:` field. And even where an older `runs-on:` IS still
+# available, actions/setup-python downloads a separately pre-built
+# Python that isn't necessarily linked against the RUNNER's own glibc
+# at all, so pinning `runs-on` alone doesn't reliably control this.
+# The actual fix used below for both Linux jobs: run the whole build
+# INSIDE a real ubuntu:20.04 Docker container (`container:` at the job
+# level — Docker images for old OS releases stay available on Docker
+# Hub indefinitely, unlike GitHub's own hosted runner labels), and
+# install Python 3.12 there via the well-established deadsnakes PPA, so
+# it's genuinely linked against THAT container's own glibc 2.31 — not
+# a mystery inherited from whatever GitHub's hosted image happens to
+# ship. `runs-on` still matters for Linux here, but now only to pick
+# the host CPU ARCHITECTURE (x86_64 vs ARM64) that Docker builds for;
+# the actual OS floor comes from the container image, not `runs-on`.
+#
+# HONESTY CHECK: this container-based Linux approach could not be
+# tested end-to-end in the environment that wrote it (no Docker
+# available there) — it follows well-established, standard patterns
+# (the container-empty-string-means-no-container matrix trick is an
+# officially supported GitHub Actions feature; deadsnakes is a
+# long-standing, widely-trusted community PPA used broadly across the
+# Python packaging world for exactly this "get a newer Python on an
+# older Ubuntu" need) but genuinely needs a real workflow run to
+# confirm it produces a working artifact before being trusted blindly.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      # fail-fast: false means if, say, the Mac build breaks, the
+      # other three still finish and upload normally — one platform's
+      # problem doesn't block the rest.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            container: ''
+            artifact_name: KADI-windows
+            build_path: dist/KADI.exe
+          # Pinned to an explicit macOS label rather than "macos-latest" —
+          # same backward-compatibility reasoning as the Linux jobs below.
+          # Originally macos-13 (Ventura, 2022): not ancient, but
+          # meaningfully older than whatever "latest" currently drifts to.
+          # macos-13 was fully retired by GitHub on Dec 4, 2025 (jobs using
+          # it now just hang waiting for a runner that no longer exists),
+          # so this now uses macos-15-intel — GitHub's designated
+          # replacement label for x86_64 (Intel) builds, since "latest"
+          # and other unqualified labels have moved to arm64 (Apple
+          # Silicon) only. Note GitHub has also announced it will retire
+          # Intel runners entirely in Fall 2027 (after the macOS 15 image
+          # itself retires) — if this build starts failing to find a
+          # runner again after that, this is the first place to check;
+          # the fix at that point would be to switch this whole job to an
+          # arm64 label and accept that older Intel Macs are then only
+          # covered by MACOSX_DEPLOYMENT_TARGET rather than the build
+          # host's own architecture.
+          # MACOSX_DEPLOYMENT_TARGET is set as an extra best-effort push
+          # toward older-Mac support in the build step below — but this
+          # is UNVERIFIED: nobody on this project currently has access
+          # to any Mac, let alone an older one, to actually confirm how
+          # far back this really reaches. Treat this as a reasonable
+          # default, not a guarantee, until someone can test on real
+          # older Mac hardware.
+          - os: macos-15-intel
+            container: ''
+            artifact_name: KADI-mac
+            build_path: dist/KADI.app
+          # Host architecture only — the actual OS/glibc floor comes
+          # from the ubuntu:20.04 container below, not from this label.
+          # If your real target machine turns out to be even older than
+          # glibc 2.31 (Ubuntu 20.04), change the container image tag
+          # below to an older release (e.g. 'ubuntu:18.04') rather than
+          # guessing again — check the target with `ldd --version` first.
+          - os: ubuntu-22.04
+            container: 'ubuntu:20.04'
+            artifact_name: KADI-linux
+            build_path: dist/KADI
+          # Native ARM64 Linux build — PyInstaller binaries are tied to
+          # the exact CPU architecture they were built on (no cross-arch
+          # compatibility at all), so the x86_64 build above genuinely
+          # cannot run on ARM64 hardware. ubuntu-22.04-arm is one of
+          # GitHub's own hosted ARM64 runners — used here purely to get
+          # an ARM64 HOST for Docker to build on; the ubuntu:20.04
+          # container image below is a proper multi-arch image, so
+          # Docker automatically pulls its arm64 variant on this host,
+          # same as it pulls the x86_64 variant on the job above.
+          #
+          # IMPORTANT — free hosted ARM64 runners ONLY work in PUBLIC
+          # repositories. In a private repo this job will simply fail
+          # to start at all ("no such label"), regardless of anything
+          # else — GitHub's paid "larger runners" tier is the only way
+          # to get ARM64 in a private repo. Worth confirming your
+          # repo's visibility before relying on this job.
+          - os: ubuntu-22.04-arm
+            container: 'ubuntu:20.04'
+            artifact_name: KADI-linux-arm64
+            build_path: dist/KADI
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+
+    steps:
+      # ── Linux-in-container only: bootstrap a bare ubuntu:20.04 image
+      # with just enough tooling for checkout + a real Python 3.12 to
+      # exist at all. Must run BEFORE actions/checkout, since checkout
+      # itself needs git, which a vanilla ubuntu:20.04 image doesn't
+      # have. DEBIAN_FRONTEND=noninteractive avoids apt hanging on a
+      # timezone prompt with no one there to answer it. binutils is
+      # here for objdump — PyInstaller's Linux analysis pass shells
+      # out to it to walk shared-library dependencies, and a bare
+      # ubuntu:20.04 image doesn't ship it by default.
+      - name: Bootstrap container OS packages (Linux only)
+        if: runner.os == 'Linux'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates curl software-properties-common binutils
+
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      # ── Linux-in-container only: real Python 3.12 — NOT
+      # actions/setup-python, since that downloads a separately
+      # pre-built Python whose own glibc linkage isn't guaranteed to
+      # match this container's (2.31) at all, which would quietly
+      # undo the whole point of building in this container in the
+      # first place.
+      #
+      # NOT deadsnakes either (previous approach): deadsnakes'
+      # support for focal (20.04) has become too unreliable to depend
+      # on — first it dropped the python3.12-venv/-dev/-tk
+      # sub-packages for focal, and on the next attempt
+      # `apt-get install python3.12` itself silently failed to
+      # install python3.12 at all (while oddly pulling in an
+      # unrelated PostgreSQL package set) with no clear apt error to
+      # act on. Rather than keep patching around a moving target,
+      # this uses `uv` (astral.sh) instead: a single static binary
+      # with no apt/PPA dependency, which downloads a self-contained,
+      # portable CPython 3.12 build (python-build-standalone) for the
+      # exact host architecture. That build is compiled against an
+      # older glibc floor than this container's own 2.31, so it's
+      # strictly safe to run here and strictly safe on the glibc-2.31
+      # target machines too — same "build on the oldest glibc you
+      # want to support" principle as the container itself, just
+      # applied one layer down. It also already bundles pip, so no
+      # separate ensurepip/get-pip step is needed.
+      #
+      # Tk is intentionally NOT installed here: python-build-standalone's
+      # Tk support requires bundling extra shared libraries for
+      # PyInstaller to pick up, which is more moving parts for a
+      # feature that's already optional — core/native_dialog.py
+      # already falls back gracefully when Tk isn't available, so
+      # Linux simply uses that fallback instead of a Tk file picker.
+      - name: Install Python 3.12 via uv (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
+          uv python install 3.12
+          PYBIN=$(dirname "$(uv python find 3.12)")
+          echo "$PYBIN" >> "$GITHUB_PATH"
+
+      # ── Windows/Mac only: the straightforward path, no container
+      # involved — actions/setup-python is exactly the right tool here,
+      # since these two platforms don't have the container-vs-runner
+      # glibc mismatch concern Linux has.
+      - name: Set up Python (Windows/Mac only)
+        if: runner.os != 'Linux'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          PYTHON=python3.12
+          PIP_FLAGS=""
+          # uv-managed Pythons (Linux only, see the install step above)
+          # mark themselves PEP 668 "externally managed" so plain pip
+          # refuses to install into them. That protection exists for
+          # Pythons shared with other tools/system use — this one exists
+          # solely for this build and nothing else depends on its
+          # site-packages staying clean, so it's safe to override here.
+          if [ "${{ runner.os }}" != "Linux" ]; then
+            PYTHON=python
+          else
+            PIP_FLAGS="--break-system-packages"
+          fi
+          $PYTHON -m pip install --upgrade pip $PIP_FLAGS
+          $PYTHON -m pip install -r requirements.txt $PIP_FLAGS
+          $PYTHON -m pip install pyinstaller $PIP_FLAGS
+        shell: bash
+
+      - name: Build with PyInstaller
+        env:
+          # Best-effort push toward older-Mac compatibility — see the
+          # macos-13 matrix entry's comment above for the honest caveat
+          # (unverified, no Mac available to test against). Harmless
+          # no-op on Windows/Linux; only read on macOS.
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: |
+          PYTHON=python3.12
+          if [ "${{ runner.os }}" != "Linux" ]; then PYTHON=python; fi
+          $PYTHON -m PyInstaller KADI.spec --noconfirm
+        shell: bash
+
+      # ── itch.io app manifest: lets itch's desktop app auto-detect
+      # and launch the right executable, and — critically for Linux —
+      # itch's app sets the executable bit itself when launching via
+      # a manifest action, sidestepping the permission-stripping
+      # problem below entirely for anyone using itch's "Install"
+      # button rather than a manual zip download.
+      - name: Add itch.io app manifest
+        shell: bash
+        run: |
+          NAME="$(basename ${{ matrix.build_path }})"
+          cat > dist/.itch.toml <<EOF
+          [[actions]]
+          name = "play"
+          path = "$NAME"
+          EOF
+
+      # ── Linux only: GitHub's upload-artifact strips all Unix
+      # permissions on upload (every file becomes 644 regardless of
+      # what it was before) — this is documented, not a bug, and it's
+      # exactly why the built KADI binary needed a manual `chmod +x`
+      # after downloading. GitHub's own recommended workaround is to
+      # tar the output first, since tar (unlike upload-artifact's own
+      # zipping) stores Unix permissions inside the archive itself —
+      # so as long as whatever unpacks it later uses `tar -x` rather
+      # than re-zipping the contents, the executable bit survives all
+      # the way to the player. Windows/Mac don't need this: .exe
+      # doesn't rely on a Unix permission bit, and .app's permissions
+      # aren't affected the same way.
+      - name: Package Linux build (preserve permissions)
+        if: runner.os == 'Linux'
+        run: |
+          chmod +x ${{ matrix.build_path }}
+          tar -czf ${{ matrix.artifact_name }}.tar.gz \
+            -C "$(dirname ${{ matrix.build_path }})" \
+            "$(basename ${{ matrix.build_path }})" .itch.toml
+
+      - name: Upload build artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload build artifact (Windows/Mac)
+        if: runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.build_path }}
+            dist/.itch.toml
+          if-no-files-found: error
+
+  # ── Windows installer (Inno Setup) ─────────────────────────────────────
+  #
+  # Separate, later job — deliberately NOT extra steps inside the `build`
+  # job's own Windows matrix entry, so a mistake here can never affect the
+  # already-proven raw-.exe build/upload path above. `needs: build` means
+  # this only starts once every `build` matrix entry (Windows included)
+  # has finished; it then downloads that job's own uploaded KADI-windows
+  # artifact rather than rebuilding anything, so it's exercising the
+  # EXACT same dist/KADI.exe a player would get from the raw-binary
+  # artifact, not a second, potentially-different build of it.
+  #
+  # installer/windows/kadi.iss (see that file's own comments for the
+  # full "why" of each setting) is the actual Inno Setup script this
+  # compiles.
+  #
+  # HONESTY CHECK: this job's logic (choco install, iscc invocation,
+  # VERSION extraction) follows Inno Setup's standard, well-documented
+  # CLI usage, but could not be run end-to-end in the environment that
+  # wrote it — no Windows machine, and no Wine available either, to
+  # actually invoke iscc there. Treat this as UNVERIFIED until a real
+  # workflow run confirms it produces a working, double-clickable
+  # installer — same pattern as the Mac build and (originally) the
+  # Linux Docker builds above.
+  installer-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Download the Windows raw-build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KADI-windows
+          path: dist
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+        shell: bash
+
+      # Extracted from constants.py rather than hardcoded a second time
+      # in kadi.iss itself, so the installer's version can never quietly
+      # drift out of sync with the actual game build — see that file's
+      # own VERSION line, the one source of truth.
+      - name: Extract game version
+        id: version
+        run: |
+          $line = Select-String -Path constants.py -Pattern '^VERSION\s*=\s*"([^"]+)"'
+          $ver = $line.Matches[0].Groups[1].Value
+          echo "value=$ver" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Compile installer with Inno Setup
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMyAppVersion=${{ steps.version.outputs.value }} `
+            installer\windows\kadi.iss
+        shell: pwsh
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KADI-windows-installer
+          path: installer/windows/installer_output/*.exe
+          if-no-files-found: error
+
+  # ── Linux: AppImage (primary) + manual-install fallback bundle ─────────
+  #
+  # Same isolation principle as installer-windows above: a separate job,
+  # `needs: build`, consuming the existing job's already-uploaded
+  # KADI-linux / KADI-linux-arm64 tar.gz artifacts rather than rebuilding
+  # anything — so this can never affect the currently-working raw-binary
+  # Linux path, and it's packaging the EXACT binary that path already
+  # produced and verified.
+  #
+  # Two outputs per architecture, matching the "AppImage as primary,
+  # .desktop as fallback extraction" decision:
+  #   1. KADI-<arch>.AppImage — portable, no install/root step, the
+  #      .desktop file baked in (installer/linux/KADI.desktop) so any
+  #      AppImage-integration tool (e.g. AppImageLauncher) picks up
+  #      Start-Menu/app-launcher integration automatically.
+  #   2. KADI-linux-manual-<arch>.tar.gz — the SAME raw binary plus
+  #      installer/linux/install-desktop-entry.sh and its .desktop
+  #      template, for anyone who prefers a plain extracted folder over
+  #      an AppImage; running that script gives the same Start-Menu
+  #      integration by hand. This is genuinely just the existing
+  #      KADI-linux(-arm64) tar.gz contents plus three extra files, not
+  #      a different build.
+  #
+  # VERIFIED IN THE ENVIRONMENT THAT WROTE THIS: a full end-to-end dry
+  # run — a real PyInstaller Linux build (not the CI's ubuntu:20.04
+  # container build, just for structural verification), a real AppDir
+  # assembly, a real appimagetool run (using --appimage-extract-and-run,
+  # since the sandbox that wrote this has no FUSE — same trick used
+  # below, since GitHub's hosted runners aren't guaranteed to have FUSE
+  # either), and running the resulting .AppImage headless. The
+  # install-desktop-entry.sh fallback script was also run for real
+  # against a real extracted binary and produced a correct
+  # ~/.local/share/applications/kadi.desktop pointing at the right
+  # path. NOT verified: the arm64 leg specifically (no ARM64 hardware
+  # available), and real desktop-environment integration (no GUI
+  # session available) — both should be spot-checked after a real
+  # workflow run, same as the raw-binary Linux builds were.
+  appimage-linux:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact_name: KADI-linux
+            appimage_name: KADI-x86_64.AppImage
+            manual_name: KADI-linux-manual-x86_64
+            appimagetool_url: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+            runs_on: ubuntu-22.04
+          - artifact_name: KADI-linux-arm64
+            appimage_name: KADI-aarch64.AppImage
+            manual_name: KADI-linux-manual-arm64
+            appimagetool_url: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
+            runs_on: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runs_on }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Download the Linux raw-build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: raw
+
+      - name: Extract the raw tar.gz
+        run: |
+          mkdir -p raw_extracted
+          tar -xzf raw/${{ matrix.artifact_name }}.tar.gz -C raw_extracted
+          chmod +x raw_extracted/KADI
+
+      # ── AppImage ─────────────────────────────────────────────────────
+      - name: Assemble AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp raw_extracted/KADI AppDir/usr/bin/KADI
+          cp assets/icon/kadi_icon.png AppDir/kadi_icon.png
+          cp installer/linux/KADI.desktop AppDir/KADI.desktop
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "${HERE}/usr/bin/KADI" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+      - name: Download appimagetool
+        run: |
+          curl -LsSf -o appimagetool "${{ matrix.appimagetool_url }}"
+          chmod +x appimagetool
+
+      - name: Build AppImage
+        run: |
+          # --appimage-extract-and-run: works whether or not this
+          # runner has FUSE available, at the cost of a slower
+          # startup for appimagetool ITSELF (irrelevant here — this
+          # runs once at build time, not something a player waits on;
+          # the AppImage this produces is a normal, unmodified
+          # AppImage that a player's own FUSE-enabled system will run
+          # directly the ordinary way).
+          ./appimagetool --appimage-extract-and-run AppDir ${{ matrix.appimage_name }}
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.appimage_name }}
+          path: ${{ matrix.appimage_name }}
+          if-no-files-found: error
+
+      # ── Manual-install fallback bundle ──────────────────────────────
+      - name: Assemble manual-install bundle
+        run: |
+          mkdir -p manual_bundle
+          cp raw_extracted/KADI manual_bundle/KADI
+          cp assets/icon/kadi_icon.png manual_bundle/kadi_icon.png
+          cp installer/linux/install-desktop-entry.sh manual_bundle/install-desktop-entry.sh
+          cp installer/linux/kadi-manual-install.desktop.template manual_bundle/kadi-manual-install.desktop.template
+          chmod +x manual_bundle/install-desktop-entry.sh manual_bundle/KADI
+          tar -czf ${{ matrix.manual_name }}.tar.gz -C manual_bundle .
+
+      - name: Upload manual-install bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.manual_name }}
+          path: ${{ matrix.manual_name }}.tar.gz
+          if-no-files-found: error

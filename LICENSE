@@ -1,0 +1,51 @@
+Copyright (c) 2026 Blaise Kinyua. All Rights Reserved.
+
+This repository is made publicly viewable for portfolio, collaboration,
+and continuous-integration purposes only. Being able to see this code
+does not grant any license to use it.
+
+Except where a different license is explicitly noted (see "Third-Party
+Assets" below), no part of this repository — including but not limited
+to its source code, game design, rules implementation, artwork, and
+documentation — may be copied, modified, merged, published,
+distributed, sublicensed, sold, or used to create derivative works, in
+whole or in part, for any purpose, without the prior express written
+permission of the copyright holder.
+
+Downloading, playing, or streaming the packaged/compiled game (as
+distributed through itch.io or another authorized storefront) is
+permitted under that storefront's own terms and does not itself grant
+any rights to this source repository.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH
+THE SOFTWARE OR ITS USE.
+
+────────────────────────────────────────────────────────────────────
+
+THIRD-PARTY ASSETS
+
+This project bundles a small number of third-party assets under their
+own, separate open licenses. Those assets — and only those assets —
+remain under the terms below, regardless of the "All Rights Reserved"
+notice above:
+
+- Cinzel and Poppins fonts (assets/fonts/) — SIL Open Font License 1.1.
+  Full license text: assets/fonts/OFL-Cinzel.txt,
+  assets/fonts/OFL-Poppins.txt.
+
+- Menu, gameplay, and Chuo background music (assets/music/) — CC0 /
+  public domain tracks by third-party creators (LushoGames, isaiah658,
+  and Ancient.Sounds respectively). See assets/music/README.md for the
+  specific track, creator, and source link for each file. The in-game
+  Settings screen's Credits panel also lists these.
+
+Any dependency listed in requirements.txt (pygame, numpy) or pulled in
+by the build process (PyInstaller, uv, and other tooling referenced in
+.github/workflows/) remains under that project's own license — none of
+those are covered or affected by this notice either; they are separate
+software this project merely uses, not code contained in this
+repository.

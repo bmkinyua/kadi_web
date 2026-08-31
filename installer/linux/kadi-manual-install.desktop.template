@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=KADI
+Comment=A full-featured implementation of the KADI card game
+Exec=__KADI_EXEC_PATH__
+Icon=__KADI_ICON_PATH__
+Categories=Game;CardGame;
+Terminal=false

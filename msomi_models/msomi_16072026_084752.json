@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "decision_schema_version": 1,
+  "model_type": "conditional_logit",
+  "features": [
+    "cards_played",
+    "cards_remaining",
+    "empties_hand",
+    "wastes_win",
+    "leaves_kadi",
+    "unanswered_question",
+    "pickup_value_added",
+    "has_suit_change",
+    "has_skip",
+    "has_kickback",
+    "has_question",
+    "next_is_threat",
+    "stranded_cluster_cost"
+  ],
+  "weights": {
+    "cards_played": 0.016869985881901233,
+    "cards_remaining": -0.051079770956671176,
+    "empties_hand": 0.46337402284757395,
+    "wastes_win": -0.04723011103273671,
+    "leaves_kadi": 1.0716637772008097,
+    "unanswered_question": -0.16761045203793815,
+    "pickup_value_added": 0.06549118331476778,
+    "has_suit_change": -0.30301542898177003,
+    "has_skip": 0.475712000970923,
+    "has_kickback": 0.9445718329649568,
+    "has_question": 0.16107936051918523,
+    "next_is_threat": 0.793220558857158,
+    "stranded_cluster_cost": -0.7241630224092136
+  },
+  "training": {
+    "num_decisions": 1599,
+    "num_human_decisions": 201,
+    "num_ai_decisions": 1398,
+    "human_weight": 2.0,
+    "iterations": 300,
+    "learning_rate": 0.3,
+    "train_agreement": 0.4590368980612883,
+    "train_agreement_human_only": 0.6368159203980099
+  }
+}
