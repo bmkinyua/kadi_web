@@ -56,6 +56,14 @@ class ServerConnection:
     name: str = "Player"
     room_id: Optional[str] = None
     transport: str = "tcp"  # 'tcp' or 'ws' -- decides how send_to()/broadcast() encode outgoing frames
+    # Stable per-platform identity, e.g. "discord:441029..." or
+    # "telegram:558213...". None for the desktop TCP client and any WS
+    # client that hasn't (or can't) supply one -- those fall back to
+    # name-keyed leaderboard entries exactly as today, see
+    # server/leaderboard_store.py's docstring for the full identity-key
+    # design and why full cross-platform account MERGING is explicitly
+    # NOT part of what this field does.
+    external_id: Optional[str] = None
     write_lock: threading.Lock = field(default_factory=threading.Lock)
     alive: bool = True
 
@@ -265,6 +273,12 @@ class ConnectionManager:
             conn = self._conns.get(conn_id)
             if conn:
                 conn.name = name
+
+    def set_external_id(self, conn_id: int, external_id: Optional[str]):
+        with self._lock:
+            conn = self._conns.get(conn_id)
+            if conn:
+                conn.external_id = external_id
 
     def get_conn(self, conn_id: int) -> Optional[ServerConnection]:
         with self._lock:

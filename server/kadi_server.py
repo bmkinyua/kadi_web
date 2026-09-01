@@ -119,7 +119,10 @@ class KadiServer:
                 # called only once (see that module's docstring).
                 name = room.winner_name()
                 if name:
-                    self.leaderboard.record_win(name, room.gm.game_id)
+                    winner_conn_id = room.winner_conn_id()
+                    winner_conn = self.conns.get_conn(winner_conn_id) if winner_conn_id is not None else None
+                    identity_key = (winner_conn.external_id if winner_conn else None) or name
+                    self.leaderboard.record_win(identity_key, name, room.gm.game_id)
                 # The final state_sync already carries everything a
                 # client needs (winner_id/finish_order_ids) -- no
                 # reconnect/resume is in scope (see server/README.md),
@@ -150,6 +153,19 @@ class KadiServer:
         if t == 'hello':
             name = str(msg.get('name') or f"Player{conn_id}")[:24]
             self.conns.set_name(conn_id, name)
+            # Optional, WEB CLIENTS ONLY: a stable per-platform identity
+            # (see server/leaderboard_store.py's identity-key docstring
+            # for what this does and doesn't guarantee -- notably, this
+            # is NOT yet verified against the platform, just recorded).
+            # The desktop TCP client never sends these, so `external_id`
+            # simply stays None for it and nothing here changes for
+            # that path.
+            platform = msg.get('platform')
+            raw_external_id = msg.get('external_id')
+            external_id = None
+            if isinstance(platform, str) and isinstance(raw_external_id, (str, int)) and str(raw_external_id):
+                external_id = f"{platform[:24]}:{str(raw_external_id)[:64]}"
+            self.conns.set_external_id(conn_id, external_id)
             return
 
         room = self.lobby.room_for_conn(conn_id)
@@ -176,10 +192,15 @@ class KadiServer:
             return
 
         if t == 'get_my_rank':
-            # Keyed off this connection's OWN current display name
-            # (see 'hello' above) -- there's no account to look up
-            # instead (see READ FIRST / server/leaderboard_store.py).
-            rank_info = self.leaderboard.rank_for(conn.name)
+            # Keyed off this connection's OWN identity: its stable
+            # platform id when it has one (see 'hello' above), falling
+            # back to its current display name otherwise -- exactly
+            # mirrors the key record_win() below uses, so a connection
+            # always finds the same entry it contributes to. There's
+            # still no account to look up instead (see
+            # server/leaderboard_store.py's docstring).
+            identity_key = conn.external_id or conn.name
+            rank_info = self.leaderboard.rank_for(identity_key)
             if rank_info is None:
                 self.conns.send_to(conn_id, {'type': 'my_rank_result', 'rank': None, 'wins': 0})
             else:

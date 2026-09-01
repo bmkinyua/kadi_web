@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KADI</title>
+  <style>
+    /* Page chrome only -- nothing here is game UI. Every element the
+       player sees as part of the GAME is a Phaser canvas object (see
+       packages/renderer/src/LobbyScene.ts's file-level note on
+       rendering discipline), never an HTML element like this page
+       shell is. */
+    html, body { margin: 0; height: 100%; background: #05060a; }
+    #game-root { display: flex; align-items: center; justify-content: center; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="game-root"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "@kadi/adapter-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/WebAdapter.ts",
+  "types": "./src/WebAdapter.ts",
+  "dependencies": {
+    "@kadi/adapter-interface": "*"
+  }
+}

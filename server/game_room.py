@@ -197,13 +197,20 @@ class GameRoom:
         server/leaderboard_store.py's docstring for why only a
         server-authoritative HUMAN win both can't be spoofed AND has a
         real display name to key off."""
-        winner = self.gm.winner
-        if winner is None:
-            return None
-        conn_id = self._conn_by_seat.get(winner.player_id)
+        conn_id = self.winner_conn_id()
         if conn_id is None:
             return None
         return self.member_names.get(conn_id)
+
+    def winner_conn_id(self) -> Optional[int]:
+        """Companion to winner_name() -- the winning connection's own
+        id, needed (alongside its display name) to look up its
+        platform identity for the leaderboard (see
+        server/leaderboard_store.py's identity-key docstring)."""
+        winner = self.gm.winner
+        if winner is None:
+            return None
+        return self._conn_by_seat.get(winner.player_id)
 
     # ── lobby ──────────────────────────────────────────────────────────────
     def roster(self) -> List[dict]:

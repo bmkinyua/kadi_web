@@ -1,0 +1,14 @@
+{
+  "name": "@kadi/renderer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@kadi/adapter-interface": "*",
+    "@kadi/client-core": "*",
+    "@kadi/protocol": "*",
+    "phaser": "^3.87.0"
+  }
+}
