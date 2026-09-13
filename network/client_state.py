@@ -53,6 +53,7 @@ from typing import Callable, Dict, List, Optional
 from constants import GameState, PlayDirection
 from core.game_manager import GameManager as _RealGameManager
 from core.rule_engine import RuleEngine
+from core.settings_store import load_persisted_value
 from models.card import Card
 from models.player import Player, HumanPlayer, Hand
 from network.client import LANClient, ConnectError
@@ -140,6 +141,20 @@ class ClientGameManager:
         self.hints_enabled = False
         self.hint_threshold_pct = 50.0
         self.undo_available = False
+        # Purely local, per-viewer display preference — like every other
+        # field mirrored in __init__, NOT part of the host's
+        # authoritative state (whether animations play is a decision
+        # for whoever's looking at THIS screen, not something the host
+        # broadcasts), so it's never in a snapshot and _apply_snapshot
+        # never touches it. Sourced from the same settings.json the
+        # local single-player GameManager loads at startup (see
+        # core/settings_store.py) so a user who's turned animations off
+        # gets that respected in network games too, rather than
+        # silently defaulting on. See scenes.GameplayScene._animate_play/
+        # _animate_draw, which read this exactly like they read the
+        # real GameManager's own attribute of the same name.
+        self.card_animations_enabled: bool = bool(
+            load_persisted_value('card_animations_enabled'))
         self.ai_game_speed = 1.0
         self.ai_spectator_speed = 1.0
         self._turn_timer_active = True

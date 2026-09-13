@@ -115,6 +115,17 @@ export class KadiConnection {
     return this.state;
   }
 
+  /** Exposed for diagnostics only (see LobbyScene.ts's status text) --
+   * a plain "Reconnecting..." with no indication of WHAT it's trying
+   * to reach is nearly undebuggable for a non-technical tester (e.g.
+   * a stale VITE_WS_URL still pointing at localhost on a phone, which
+   * looks IDENTICAL to a firewall block or a server that isn't
+   * running -- all three show as "stuck reconnecting forever" with no
+   * further detail otherwise). */
+  getUrl(): string {
+    return this.url;
+  }
+
   private setState(next: ConnectionState): void {
     this.state = next;
     for (const listener of this.stateListeners) listener(next);

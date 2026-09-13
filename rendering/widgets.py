@@ -330,6 +330,55 @@ def draw_icon(surf: pygame.Surface, rect: pygame.Rect, kind: str,
         pygame.draw.line(surf, color, (cx - r * 0.28, cy + r * 0.30),
                          (cx + r * 0.28, cy + r * 0.30), width + 1)
 
+    elif kind == 'twitter':
+        # X/Twitter's current wordmark logo is just a bold X — drawn as
+        # two thick crossing bars (not two thin lines like the generic
+        # 'close'/'cross' glyphs above) since the real logo reads as
+        # solid strokes even at small icon sizes. Same "plain vector
+        # instead of a missing/blurry glyph" reasoning as the rest of
+        # this function; also sidesteps bundling a trademarked logo
+        # image asset.
+        pad_x, pad_y = w * 0.22, h * 0.22
+        bar_w = max(2, int(min(w, h) * 0.16))
+        pygame.draw.line(surf, color, (rect.left + pad_x, rect.top + pad_y),
+                         (rect.right - pad_x, rect.bottom - pad_y), bar_w)
+        pygame.draw.line(surf, color, (rect.right - pad_x, rect.top + pad_y),
+                         (rect.left + pad_x, rect.bottom - pad_y), bar_w)
+
+    elif kind == 'email':
+        # Simple envelope: outer rect + a "V" flap line — the universal
+        # cross-platform email glyph, drawn as shapes for the same
+        # missing-glyph reasons as everything else here.
+        env = pygame.Rect(0, 0, w * 0.72, h * 0.52)
+        env.center = (cx, cy)
+        pygame.draw.rect(surf, color, env, width=width, border_radius=1)
+        pygame.draw.line(surf, color, env.topleft,
+                         (env.centerx, env.centery + env.height * 0.08), width)
+        pygame.draw.line(surf, color, env.topright,
+                         (env.centerx, env.centery + env.height * 0.08), width)
+
+    elif kind == 'linkedin':
+        # LinkedIn's mark is a lowercase "in" — approximated with plain
+        # shapes (a dot + stem for the "i", a stem + loop for the "n")
+        # rather than relying on the bundled font actually having a
+        # bold-enough "in" at icon size, and rather than bundling the
+        # trademarked square-logo image asset.
+        stem_w = max(2, int(min(w, h) * 0.14))
+        i_x = cx - w * 0.16
+        i_top = cy - h * 0.14
+        i_bottom = cy + h * 0.26
+        pygame.draw.line(surf, color, (i_x, i_top), (i_x, i_bottom), stem_w)
+        pygame.draw.circle(surf, color, (i_x, cy - h * 0.28), max(2, stem_w * 0.7))
+        n_x = cx + w * 0.10
+        n_top = cy - h * 0.14
+        n_bottom = cy + h * 0.26
+        pygame.draw.line(surf, color, (n_x, n_top), (n_x, n_bottom), stem_w)
+        arc_rect = pygame.Rect(0, 0, w * 0.30, h * 0.42)
+        arc_rect.midtop = (n_x, n_top)
+        pygame.draw.arc(surf, color, arc_rect, -1.57, 1.57, stem_w)
+        pygame.draw.line(surf, color, (n_x + w * 0.15, cy),
+                         (n_x + w * 0.15, i_bottom), stem_w)
+
 
 def _heart_curve_points(n: int = 48) -> List[Tuple[float, float]]:
     """A single smooth closed curve (the standard heart parametric

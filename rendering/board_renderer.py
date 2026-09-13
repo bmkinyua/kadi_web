@@ -596,7 +596,13 @@ class BoardRenderer:
             surf.blit(glow, (cx - r, cy - r))
 
     def draw_piles(self, surf: pygame.Surface, top_card: Optional[Card],
-                   draw_count: int, current_suit: Optional[Suit]):
+                   draw_count: int, current_suit: Optional[Suit],
+                   suppress_top: bool = False):
+        """suppress_top=True skips drawing the top discard card — used
+        while an AnimatedCard is still flying toward the discard pile
+        (see GameplayScene.draw()/draw_animated_card above), so the
+        card doesn't appear to "arrive" instantly while its own flight
+        animation is still mid-air on top of it."""
         discard_pos = self._discard_pos()
         draw_pos    = self._draw_pos()
         cw, ch = self.card_w, self.card_h
@@ -615,7 +621,7 @@ class BoardRenderer:
                         draw_pos[1] + ch + 6))
 
         # Discard pile
-        if top_card:
+        if top_card and not suppress_top:
             # Stack behind
             for i in range(min(3, 5)):
                 offset_x = (i - 1) * 2
@@ -864,12 +870,23 @@ class BoardRenderer:
                   drag_pos: Optional[Tuple[int, int]] = None,
                   drag_target: Optional[int] = None,
                   hint_idx: Optional[int] = None,
-                  reveal_override: Optional[bool] = None):
+                  reveal_override: Optional[bool] = None,
+                  hide_tail: int = 0):
         # reveal_override lets a caller force every seat's cards face-up
         # regardless of the normal "only seat 0 (human) is face-up" rule
         # — used for AI Spectator Mode, where every remaining player is
         # an AI and there's no hidden-information reason left to keep
         # their hands hidden from whoever's watching.
+        #
+        # hide_tail hides the LAST `hide_tail` cards in this player's
+        # hand from the normal static render — used while an
+        # AnimatedCard is still flying toward one of those slots (a
+        # newly drawn/dealt card, always appended at the end of
+        # hand.cards) or away from one (about to be played — see
+        # GameplayScene's animation wiring), so the same card doesn't
+        # appear to snap into/out of place while its own flight
+        # animation is still on screen. 0 (default) draws every card
+        # normally, same as before this parameter existed.
         is_seat0 = layout['face_up']
         face_up = is_seat0 if reveal_override is None else reveal_override
         cx = layout['hand_cx']
@@ -888,8 +905,12 @@ class BoardRenderer:
         else:
             max_width = layout.get('opp_max_width', 280)
 
+        cards = player.hand.cards
+        if hide_tail > 0:
+            cards = cards[:-hide_tail] if hide_tail < len(cards) else []
+
         self.hand_renderer.render(
-            surf, player.hand.cards, cx, cy,
+            surf, cards, cx, cy,
             face_up=face_up, selected=selected, playable=playable,
             hovered=hovered, is_current=is_current,
             max_width=max_width,
@@ -931,6 +952,34 @@ class BoardRenderer:
     def discard_pile_rect(self) -> pygame.Rect:
         discard_pos = self._discard_pos()
         return pygame.Rect(discard_pos[0], discard_pos[1], self.card_w, self.card_h)
+
+    # ─── Card animations (see animation/animator.py's AnimationManager) ────────
+
+    def draw_animated_card(self, surf: pygame.Surface, anim_card) -> None:
+        """Renders one AnimatedCard mid-flight — the animation classes
+        themselves are pure data (position/scale/alpha tweens only, no
+        drawing), so this is the one place that actually knows how to
+        turn that into pixels, reusing the same card-surface cache
+        (get_card_surface_scaled/get_card_back_scaled) as everything
+        else in this renderer. GameplayScene.draw() calls this once per
+        active animation, layered on top of the normal table/hand/pile
+        drawing (see that method's own comments on why the source/
+        destination of each animated card is separately suppressed from
+        the normal static draw for the duration of its flight — without
+        that, the card would render twice: once frozen in its old/new
+        spot, once flying over the top of it)."""
+        cw = max(1, round(self.card_w * anim_card.scale))
+        ch = max(1, round(self.card_h * anim_card.scale))
+        if anim_card.face_up:
+            card_surf = self.assets.get_card_surface_scaled(anim_card.card, True, cw, ch)
+        else:
+            card_surf = self.assets.get_card_back_scaled(cw, ch)
+        alpha = max(0, min(255, anim_card.alpha))
+        if alpha < 255:
+            card_surf = card_surf.copy()
+            card_surf.set_alpha(alpha)
+        x, y = anim_card.pos
+        surf.blit(card_surf, (x - cw / 2, y - ch / 2))
 
 
 GOLD_LIGHT = (255, 215, 0)

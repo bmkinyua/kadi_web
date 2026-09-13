@@ -2,16 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover: lets iOS Safari report real, non-zero
+       env(safe-area-inset-*) values (notch/home-indicator) instead of
+       zeroing them out -- see adapters/web/src/WebAdapter.ts's
+       getSafeAreaInsets(), which reads these via a probe element
+       (Part D). Without this the insets are always 0 on iOS even on
+       a notched device. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>KADI</title>
   <style>
     /* Page chrome only -- nothing here is game UI. Every element the
        player sees as part of the GAME is a Phaser canvas object (see
        packages/renderer/src/LobbyScene.ts's file-level note on
        rendering discipline), never an HTML element like this page
-       shell is. */
-    html, body { margin: 0; height: 100%; background: #05060a; }
-    #game-root { display: flex; align-items: center; justify-content: center; height: 100%; }
+       shell is.
+
+       #game-root fills the full viewport (not a centered fixed box)
+       because the renderer's Scale Manager now runs in
+       Phaser.Scale.RESIZE mode (see packages/renderer/src/index.ts) --
+       the canvas is told to match this element's actual size exactly,
+       continuously, rather than being letterboxed inside it. */
+    html, body { margin: 0; width: 100%; height: 100%; background: #05060a; overflow: hidden; }
+    #game-root { width: 100%; height: 100%; }
   </style>
 </head>
 <body>

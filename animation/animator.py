@@ -192,12 +192,20 @@ class AnimationManager:
                          on_complete=on_complete)
         self._active.append(a)
 
-    def draw_card(self, card, deck_pos, hand_pos, face_up=True, on_complete=None):
-        a = AnimatedCard(card, deck_pos, hand_pos, duration=0.28,
-                         face_up=face_up, easing='ease_out',
-                         start_scale=0.9, end_scale=1.0,
-                         on_complete=on_complete)
-        self._active.append(a)
+    def draw_card(self, card, deck_pos, hand_pos, face_up=True, delay=0.0,
+                  on_complete=None):
+        def _start():
+            a = AnimatedCard(card, deck_pos, hand_pos, duration=0.28,
+                             face_up=face_up, easing='ease_out',
+                             start_scale=0.9, end_scale=1.0,
+                             on_complete=on_complete)
+            self._active.append(a)
+
+        if delay > 0:
+            t = Tween(0, 1, delay, on_complete=_start)
+            self._tweens.append(t)
+        else:
+            _start()
 
     def clear(self):
         self._active.clear()

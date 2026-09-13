@@ -138,7 +138,7 @@ def run():
     # Idempotency: calling record_win again for the SAME game_id must
     # be a no-op.
     before = server.leaderboard.rank_for(winner_name)
-    incremented_again = server.leaderboard.record_win(winner_name, room.gm.game_id)
+    incremented_again = server.leaderboard.record_win(winner_name, winner_name, room.gm.game_id)
     after = server.leaderboard.rank_for(winner_name)
     check("duplicate record_win for the same game_id is rejected", incremented_again is False)
     check("duplicate record_win did not change the win count", before == after)
