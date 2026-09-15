@@ -40,7 +40,7 @@
 import Phaser from 'phaser';
 import { KadiConnection } from '@kadi/client-core';
 import type { ConnectionState } from '@kadi/client-core';
-import type { ServerMessage } from '@kadi/protocol';
+import type { CreateGameSettings, ServerMessage } from '@kadi/protocol';
 import type { PlatformAdapter } from '@kadi/adapter-interface';
 import { computeLobbyLayout, type LobbyLayout } from './layout/LobbyLayout.js';
 
@@ -67,6 +67,23 @@ export class LobbyScene extends Phaser.Scene {
    * "Quick Play vs AI" button after already choosing that mode one
    * screen back. */
   private autoQuickPlay = false;
+<<<<<<< HEAD
+=======
+  /** Real per-game settings from GameConfigScene(vsAi=true)'s "Start
+   * Game" (opponent count/difficulty/elimination mode/MSOMI) --
+   * falls back to the original fixed Quick Play settings
+   * ({ai_count:1, ai_difficulty:'MEDIUM'}) when undefined, e.g. for
+   * GameTableScene's own post-game "Play Again" route back here,
+   * which never carried real config and shouldn't have to. */
+  private gameSettings: CreateGameSettings | undefined;
+  /** GameConfigScene's "Your Name" field, applied via
+   * adapter.setDisplayName() before 'hello' goes out -- see that
+   * scene's own onStartGame() for why this lives here rather than
+   * GameConfigScene sending 'hello' itself (this scene already owns
+   * the one connection's whole hello/create/start lifecycle, bugfixes
+   * and all -- see this file's own header). */
+  private playerName: string | undefined;
+>>>>>>> 399e25e (Kadi Web Dev 1)
   private unsubscribers: (() => void)[] = [];
 
   /** Most recent leaderboard payload, kept around so a resize can
@@ -83,9 +100,22 @@ export class LobbyScene extends Phaser.Scene {
    * before the game boots -- see that file for why adapter selection
    * happens there, at build/entry time, rather than this scene
    * guessing which platform it's on. */
+<<<<<<< HEAD
   init(data: { adapter: PlatformAdapter; autoQuickPlay?: boolean }): void {
     this.adapter = data.adapter;
     this.autoQuickPlay = data.autoQuickPlay ?? false;
+=======
+  init(data: {
+    adapter: PlatformAdapter;
+    autoQuickPlay?: boolean;
+    gameSettings?: CreateGameSettings;
+    playerName?: string;
+  }): void {
+    this.adapter = data.adapter;
+    this.autoQuickPlay = data.autoQuickPlay ?? false;
+    this.gameSettings = data.gameSettings;
+    this.playerName = data.playerName;
+>>>>>>> 399e25e (Kadi Web Dev 1)
     // BUGFIX (post-drag-to-reorder manual test): Phaser scenes are
     // singleton instances -- this.scene.start('LobbyScene', ...) from
     // GameTableScene's win screen (see that file's renderWinScreen())
@@ -264,10 +294,23 @@ export class LobbyScene extends Phaser.Scene {
     this.quickPlayRequested = true;
     this.quickPlayButton.setAlpha(0.5);
     this.quickPlayLabel.setText('Starting…');
+<<<<<<< HEAD
     this.connection.send({ type: 'create_game', settings: { ai_count: 1, ai_difficulty: 'MEDIUM' } });
+=======
+    this.connection.send({
+      type: 'create_game',
+      settings: this.gameSettings ?? { ai_count: 1, ai_difficulty: 'MEDIUM' },
+    });
+>>>>>>> 399e25e (Kadi Web Dev 1)
   }
 
   private async sendHelloAndRequestLeaderboard(): Promise<void> {
+    if (this.playerName) {
+      // GameConfigScene's "Your Name" field -- applied before reading
+      // getDisplayName() back so 'hello' carries what the player just
+      // typed, not last session's stored name.
+      await this.adapter.setDisplayName(this.playerName);
+    }
     const name = await this.adapter.getDisplayName();
     const identity = await this.adapter.getPlatformIdentity();
     this.identityText.setText(`Playing as ${name}`);

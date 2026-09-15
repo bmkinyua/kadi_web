@@ -6,11 +6,22 @@
  * `bootedGame.scene.add('LobbyScene', LobbyScene, true, { adapter })`),
  * and LobbyScene itself offered nothing but "Quick Play vs AI" — no
  * real menu, no way to reach a future Internet Multiplayer flow
+<<<<<<< HEAD
  * without it being bolted onto the lobby screen itself. This scene is
  * the plan §9 fix: Main Menu → Mode Select → Lobby, matching the PC
  * client's own entry flow (scenes.py's MainMenuScene → ModeSelectScene)
  * at the scope this web pass actually needs — see MainMenuLayout.ts's
  * own docstring for exactly which PC buttons made the cut and why.
+=======
+ * without it being bolted onto the lobby screen itself. This scene
+ * now matches the PC client's own entry flow exactly (scenes.py's
+ * MainMenuScene): "Play vs AI" routes straight to
+ * GameConfigScene(vsAi=true) (no intermediate screen), and
+ * "Multiplayer" routes to MultiplayerMenuScene, which itself splits
+ * into Local Multiplayer (GameConfigScene(vsAi=false)) and Internet
+ * Multiplayer — see MainMenuLayout.ts's own docstring for exactly
+ * which PC buttons made the cut and why.
+>>>>>>> 399e25e (Kadi Web Dev 1)
  *
  * RENDERING/LAYOUT DISCIPLINE: same as every other scene (§6, §6a) —
  * canvas-only GameObjects, every position/size from
@@ -23,6 +34,11 @@ import {
   type MainMenuButtonLayout,
   type MainMenuLayout,
 } from './layout/MainMenuLayout.js';
+<<<<<<< HEAD
+=======
+import { HelpOverlay } from './HelpOverlay.js';
+import { MAIN_MENU_HELP } from './layout/HELP_CONTENT.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 
 interface ButtonObjects {
   rect: Phaser.GameObjects.Rectangle;
@@ -41,6 +57,10 @@ export class MainMenuScene extends Phaser.Scene {
   private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
   private buttonObjects = new Map<string, ButtonObjects>();
+<<<<<<< HEAD
+=======
+  private helpOverlay!: HelpOverlay;
+>>>>>>> 399e25e (Kadi Web Dev 1)
 
   constructor() {
     super('MainMenuScene');
@@ -78,12 +98,31 @@ export class MainMenuScene extends Phaser.Scene {
       this.buttonObjects.set(button.id, this.createButton(button));
     }
 
+<<<<<<< HEAD
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     });
   }
 
+=======
+    // Help Overlay ("?" button + Quick Guide popup) -- ported from
+    // scenes.MainMenuScene.HELP_SECTIONS, see HELP_CONTENT.ts.
+    this.helpOverlay = new HelpOverlay(this, this.adapter, MAIN_MENU_HELP);
+    this.helpOverlay.create();
+
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+      this.helpOverlay.destroy();
+    });
+  }
+
+  update(_time: number, delta: number): void {
+    this.helpOverlay.update(delta);
+  }
+
+>>>>>>> 399e25e (Kadi Web Dev 1)
   private currentLayout(): MainMenuLayout {
     const viewport = { width: this.scale.width, height: this.scale.height };
     const insets = this.adapter.getSafeAreaInsets();
@@ -127,8 +166,15 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private onButtonTapped(id: string): void {
+<<<<<<< HEAD
     if (id === 'play') {
       this.scene.start('ModeSelectScene', { adapter: this.adapter });
+=======
+    if (id === 'playVsAi') {
+      this.scene.start('GameConfigScene', { adapter: this.adapter, vsAi: true, msomiStore: this.msomiStore });
+    } else if (id === 'multiplayer') {
+      this.scene.start('MultiplayerMenuScene', { adapter: this.adapter, msomiStore: this.msomiStore });
+>>>>>>> 399e25e (Kadi Web Dev 1)
     } else if (id === 'howToPlay') {
       this.scene.start('RulesScene', { adapter: this.adapter });
     } else if (id === 'settings') {
@@ -165,5 +211,10 @@ export class MainMenuScene extends Phaser.Scene {
       }
       objects.label.setPosition(cx, cy);
     }
+<<<<<<< HEAD
+=======
+
+    this.helpOverlay.layout();
+>>>>>>> 399e25e (Kadi Web Dev 1)
   }
 }

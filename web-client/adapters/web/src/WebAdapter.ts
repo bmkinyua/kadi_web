@@ -144,7 +144,7 @@ export class WebAdapter implements PlatformAdapter {
     return generated;
   }
 
-  setDisplayName(name: string): void {
+  async setDisplayName(name: string): Promise<void> {
     localStorage.setItem(STORAGE_KEY_NAME, name);
   }
 

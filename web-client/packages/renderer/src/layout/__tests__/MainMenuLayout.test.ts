@@ -17,6 +17,7 @@ describe('computeMainMenuLayout', () => {
     }
   });
 
+<<<<<<< HEAD
   it('returns exactly the five planned buttons, in a stable order', () => {
     const layout = computeMainMenuLayout(MID_TABLET_PANEL, ZERO_INSETS);
     expect(layout.buttons.map((b) => b.id)).toEqual(['play', 'profile', 'settings', 'howToPlay', 'chuo']);
@@ -26,6 +27,25 @@ describe('computeMainMenuLayout', () => {
     const layout = computeMainMenuLayout(MID_TABLET_PANEL, ZERO_INSETS);
     const byId = Object.fromEntries(layout.buttons.map((b) => [b.id, b.enabled]));
     expect(byId.play).toBe(true);
+=======
+  it('returns exactly the six planned buttons, in a stable order', () => {
+    const layout = computeMainMenuLayout(MID_TABLET_PANEL, ZERO_INSETS);
+    expect(layout.buttons.map((b) => b.id)).toEqual([
+      'playVsAi',
+      'multiplayer',
+      'profile',
+      'settings',
+      'howToPlay',
+      'chuo',
+    ]);
+  });
+
+  it('marks all six buttons enabled -- chuo is now wired to ChuoScene', () => {
+    const layout = computeMainMenuLayout(MID_TABLET_PANEL, ZERO_INSETS);
+    const byId = Object.fromEntries(layout.buttons.map((b) => [b.id, b.enabled]));
+    expect(byId.playVsAi).toBe(true);
+    expect(byId.multiplayer).toBe(true);
+>>>>>>> 399e25e (Kadi Web Dev 1)
     expect(byId.profile).toBe(true);
     expect(byId.settings).toBe(true);
     expect(byId.howToPlay).toBe(true);

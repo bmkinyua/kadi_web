@@ -104,6 +104,11 @@ import {
 import { isCardPlayable } from './cardPlayability.js';
 import { moveCard, reconcileHandOrder } from './handOrder.js';
 import { StatusTextGuard } from './statusText.js';
+<<<<<<< HEAD
+=======
+import { HelpOverlay } from './HelpOverlay.js';
+import { GAMEPLAY_HELP } from './layout/HELP_CONTENT.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 import {
   applyGameSummary,
   BADGE_DEFS,
@@ -194,6 +199,10 @@ export class GameTableScene extends Phaser.Scene {
   private awaitingRejoin = false;
 
   private lastSync: StateSyncMsg | null = null;
+<<<<<<< HEAD
+=======
+  private helpOverlay!: HelpOverlay;
+>>>>>>> 399e25e (Kadi Web Dev 1)
   private selected = new Set<number>();
   private dynamic: Phaser.GameObjects.GameObject[] = [];
   private statusText!: Phaser.GameObjects.Text;
@@ -291,6 +300,16 @@ export class GameTableScene extends Phaser.Scene {
     );
     this.onConnectionState(this.connection.getState());
 
+<<<<<<< HEAD
+=======
+    // Help Overlay -- ported from scenes.GameplayScene.HELP_SECTIONS,
+    // see HELP_CONTENT.ts. Its idle-glow accrual is turn-gated (see
+    // update() below) -- one deviation from every other help-enabled
+    // screen, matching GameplayScene.update()'s own one deviation.
+    this.helpOverlay = new HelpOverlay(this, this.adapter, GAMEPLAY_HELP);
+    this.helpOverlay.create();
+
+>>>>>>> 399e25e (Kadi Web Dev 1)
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     // Scene-wide (not per-card-rect) pointer tracking for drag-to-reorder:
     // once a card's own 'pointerdown' arms dragStartPos/dragPendingIdx (see
@@ -304,6 +323,10 @@ export class GameTableScene extends Phaser.Scene {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
       this.input.off(Phaser.Input.Events.POINTER_MOVE, this.handlePointerMove, this);
       this.input.off(Phaser.Input.Events.POINTER_UP, this.handlePointerUp, this);
+<<<<<<< HEAD
+=======
+      this.helpOverlay.destroy();
+>>>>>>> 399e25e (Kadi Web Dev 1)
       for (const unsub of this.unsubscribers) unsub();
       this.unsubscribers = [];
     });
@@ -463,9 +486,37 @@ export class GameTableScene extends Phaser.Scene {
   }
 
   private handleResize(): void {
+<<<<<<< HEAD
     this.render();
   }
 
+=======
+    this.helpOverlay.layout();
+    this.render();
+  }
+
+  /** Whether idle time should accrue right now -- mirrors
+   * GameplayScene.update()'s own `self.gm.current_player.is_human and
+   * not self.gm.is_paused` check (scenes.py ~7880): waiting on the AI,
+   * or a paused game, isn't "stuck," so the nudge shouldn't count that
+   * time. Same condition renderLocalHand() already computes locally as
+   * `myTurnToAct`, duplicated here since that one's scoped to a single
+   * render() call and this needs to run every frame regardless of
+   * whether a render happened. */
+  private isMyActionableTurn(): boolean {
+    const sync = this.lastSync;
+    if (!sync || sync.state === 'PAUSED') return false;
+    return (
+      (sync.state === 'PLAYING' && sync.current_player_idx === sync.you) ||
+      (sync.state === 'JUMP_COUNTER_WINDOW' && sync.counter_player_idx === sync.you)
+    );
+  }
+
+  update(_time: number, delta: number): void {
+    this.helpOverlay.update(delta, this.isMyActionableTurn());
+  }
+
+>>>>>>> 399e25e (Kadi Web Dev 1)
   private currentLayout(): GameTableLayout | null {
     if (!this.lastSync) return null;
     const viewport = { width: this.scale.width, height: this.scale.height };

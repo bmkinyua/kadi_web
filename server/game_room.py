@@ -311,7 +311,8 @@ class GameRoom:
             ("Elimination Mode", "ON" if elimination_mode else "OFF"),
         ]
         if elimination_mode:
-            rows.append(("  AI continues alone", "ON"))  # see start_game(): always True
+            ai_only_continue = bool(self.settings.get('elimination_ai_only_continue', True))
+            rows.append(("  AI continues alone", "ON" if ai_only_continue else "OFF"))
         rows.extend(build_rule_rows(self.gm))
         ai_count = int(self.settings.get('ai_count', 0) or 0)
         ai_difficulty = str(self.settings.get('ai_difficulty', 'MEDIUM')).title()
@@ -364,8 +365,18 @@ class GameRoom:
                                if conn_id in self._token_by_conn}
 
         self.gm.subscribe(self._on_event)
-        self.gm.new_game(configs, elimination_mode=bool(self.settings.get('elimination_mode')),
-                         elimination_ai_only_continue=True)
+        # elimination_ai_only_continue: previously hardcoded True here
+        # regardless of what a client sent, even though
+        # GameManager.new_game() has accepted this parameter all
+        # along (core/game_manager.py) -- found while investigating
+        # web GameConfigScene parity (this room's own
+        # settings_summary_rows() already assumed True unconditionally
+        # too, in its "AI continues alone" row below). True remains
+        # the default when the key is absent, so this is backward
+        # compatible with every existing client that never set it.
+        self.gm.new_game(
+            configs, elimination_mode=bool(self.settings.get('elimination_mode')),
+            elimination_ai_only_continue=bool(self.settings.get('elimination_ai_only_continue', True)))
         if self._msomi_model is not None:
             # Attaching post-construction (rather than threading a
             # model dict through GameManager.new_game()'s own

@@ -17,6 +17,7 @@
     "test:persistence": "npm run test -w adapters/web"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "tsx": "^4.23.13",
     "typescript": "^5.6.3",
     "@types/node": "^22.10.2"

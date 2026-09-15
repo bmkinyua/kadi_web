@@ -8,12 +8,32 @@
  * SCOPE (plan §9, Feature Parity Tracking): the PC entry point
  * (scenes.py's MainMenuScene) offers Continue Game / Play vs AI /
  * Multiplayer / How to Play / Settings / Chuo / Profile / Quit. This
+<<<<<<< HEAD
  * web port now covers five of those eight rows:
  *
  * - "Play" — the only ENABLED button. Routes to ModeSelectScene
  *   (see MainMenuScene.ts), which itself only offers the two modes
  *   that exist or are planned for web (vs AI, Internet Multiplayer;
  *   LAN is permanently out per §9).
+=======
+ * web port now covers six of those eight rows:
+ *
+ * - "Play vs AI" — routes DIRECTLY to GameConfigScene(vsAi=true) (see
+ *   MainMenuScene.ts), matching MainMenuScene._rebuild_buttons()'s
+ *   own `on_click=lambda: self.manager.switch('mode_select',
+ *   vs_ai=True)` -- no intermediate screen, exactly as the PC does
+ *   it. Previously routed to the now-removed ModeSelectScene, which
+ *   was itself only a "which mode" picker, not PC's real per-game
+ *   config screen -- see GameConfigLayout.ts's own header for why
+ *   that gap is now closed.
+ * - "Multiplayer" — routes to MultiplayerMenuScene (see
+ *   MainMenuScene.ts and layout/MultiplayerMenuLayout.ts), matching
+ *   MainMenuScene._rebuild_buttons()'s own Multiplayer button
+ *   (`self.manager.switch('multiplayer_menu')`). Splits into Local
+ *   Multiplayer (routes to GameConfigScene(vsAi=false)) and Internet
+ *   Multiplayer (routes to InternetLobbyScene, untouched); LAN is
+ *   permanently out per §9.
+>>>>>>> 399e25e (Kadi Web Dev 1)
  * - "How to Play" — ENABLED as of this pass, routing to RulesScene
  *   (see MainMenuScene.ts). §9's Feature Parity Tracking row for this
  *   moves from "planned" to "done" alongside this change.
@@ -45,7 +65,11 @@ import { type ContentRect, getSafeContentRect } from './safeArea.js';
 import type { TextLayout } from './LobbyLayout.js';
 import type { SafeAreaInsets } from '@kadi/adapter-interface';
 
+<<<<<<< HEAD
 export type MainMenuButtonId = 'play' | 'profile' | 'settings' | 'howToPlay' | 'chuo';
+=======
+export type MainMenuButtonId = 'playVsAi' | 'multiplayer' | 'profile' | 'settings' | 'howToPlay' | 'chuo';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 
 export interface MainMenuButtonLayout {
   id: MainMenuButtonId;
@@ -73,7 +97,12 @@ const BASE_BUTTON_GAP = 16;
 const BASE_BUTTONS_START_Y = 210;
 
 const BUTTON_DEFS: { id: MainMenuButtonId; label: string; enabled: boolean }[] = [
+<<<<<<< HEAD
   { id: 'play', label: 'Play', enabled: true },
+=======
+  { id: 'playVsAi', label: 'Play vs AI', enabled: true },
+  { id: 'multiplayer', label: 'Multiplayer', enabled: true },
+>>>>>>> 399e25e (Kadi Web Dev 1)
   { id: 'profile', label: 'Profile', enabled: true },
   { id: 'settings', label: 'Settings', enabled: true },
   { id: 'howToPlay', label: 'How to Play', enabled: true },

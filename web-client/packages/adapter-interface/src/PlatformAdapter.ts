@@ -45,6 +45,16 @@ export interface PlatformAdapter {
    * identity-key docstring for what that limit means in practice. */
   getPlayerId(): Promise<string>;
   getDisplayName(): Promise<string>;
+  /** Persists a new display name for this device/session, overriding
+   * whatever getDisplayName() would otherwise return. Added for
+   * GameConfigScene.ts's "Your Name" field (Part C/D of the local-
+   * multiplayer-parity task) -- the first place in this codebase that
+   * lets a player type a name rather than only reading one back.
+   * Every adapter must implement this, even a minimal in-memory
+   * stand-in (matches the rest of this interface's "real, typed,
+   * intentionally minimal for now" methods -- see this file's
+   * header). */
+  setDisplayName(name: string): Promise<void>;
   getAvatarUrl(): Promise<string | null>;
 
   /** Returns null for a platform with no stable identity to offer

@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 import type { MsomiStore, PlatformAdapter } from '@kadi/adapter-interface';
 import { MainMenuScene } from './MainMenuScene.js';
+<<<<<<< HEAD
 import { ModeSelectScene } from './ModeSelectScene.js';
+=======
+import { MultiplayerMenuScene } from './MultiplayerMenuScene.js';
+import { GameConfigScene } from './GameConfigScene.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 import { LobbyScene } from './LobbyScene.js';
 import { InternetLobbyScene } from './InternetLobbyScene.js';
 import { GameTableScene } from './GameTableScene.js';
@@ -19,7 +24,12 @@ import {
 } from './layout/scale.js';
 
 export { MainMenuScene } from './MainMenuScene.js';
+<<<<<<< HEAD
 export { ModeSelectScene } from './ModeSelectScene.js';
+=======
+export { MultiplayerMenuScene } from './MultiplayerMenuScene.js';
+export { GameConfigScene } from './GameConfigScene.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 export { LobbyScene } from './LobbyScene.js';
 export { InternetLobbyScene } from './InternetLobbyScene.js';
 export { GameTableScene } from './GameTableScene.js';
@@ -30,7 +40,12 @@ export { ChuoScene } from './ChuoScene.js';
 export * from './layout/scale.js';
 export * from './layout/safeArea.js';
 export * from './layout/MainMenuLayout.js';
+<<<<<<< HEAD
 export * from './layout/ModeSelectLayout.js';
+=======
+export * from './layout/MultiplayerMenuLayout.js';
+export * from './layout/GameConfigLayout.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 export * from './layout/LobbyLayout.js';
 export * from './layout/InternetLobbyLayout.js';
 export * from './layout/GameTableLayout.js';
@@ -100,6 +115,7 @@ export function bootstrapGame(
     scene: [],
     callbacks: {
       postBoot: (bootedGame) => {
+<<<<<<< HEAD
         // ModeSelectScene, LobbyScene, InternetLobbyScene,
         // GameTableScene, RulesScene, SettingsScene, ProfileScene, and
         // ChuoScene are only ever entered via a scene.start() from the
@@ -114,6 +130,25 @@ export function bootstrapGame(
         bootedGame.scene.add('LobbyScene', LobbyScene, false);
         bootedGame.scene.add('InternetLobbyScene', InternetLobbyScene, false);
         bootedGame.scene.add('ModeSelectScene', ModeSelectScene, false);
+=======
+        // MultiplayerMenuScene, GameConfigScene, LobbyScene,
+        // InternetLobbyScene, GameTableScene, RulesScene,
+        // SettingsScene, ProfileScene, and ChuoScene are only ever
+        // entered via a scene.start() from the scene before them in
+        // the flow (MainMenu -> GameConfigScene(vsAi=true) directly,
+        // MainMenu -> MultiplayerMenuScene -> GameConfigScene(vsAi=
+        // false)/InternetLobbyScene -> GameTable, MainMenu ->
+        // RulesScene, MainMenu -> SettingsScene, MainMenu ->
+        // ProfileScene, MainMenu -> ChuoScene, see each scene's own
+        // docstring) -- registered here (autoStart=false) purely so
+        // Phaser's scene manager knows the keys exist to start later;
+        // each gets its real init data at that point, not now.
+        bootedGame.scene.add('GameTableScene', GameTableScene, false);
+        bootedGame.scene.add('LobbyScene', LobbyScene, false);
+        bootedGame.scene.add('InternetLobbyScene', InternetLobbyScene, false);
+        bootedGame.scene.add('MultiplayerMenuScene', MultiplayerMenuScene, false);
+        bootedGame.scene.add('GameConfigScene', GameConfigScene, false);
+>>>>>>> 399e25e (Kadi Web Dev 1)
         bootedGame.scene.add('RulesScene', RulesScene, false);
         bootedGame.scene.add('SettingsScene', SettingsScene, false);
         bootedGame.scene.add('ProfileScene', ProfileScene, false);

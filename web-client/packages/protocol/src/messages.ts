@@ -101,6 +101,27 @@ export interface CreateGameSettings {
   ai_count?: number;
   ai_difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   elimination_mode?: boolean;
+<<<<<<< HEAD
+=======
+  /** Only meaningful when elimination_mode is true -- mirrors
+   * scenes.ModeSelectScene's "AI-only continue" sub-toggle
+   * (GameManager.new_game()'s own elimination_ai_only_continue
+   * param, which server/game_room.py's start_game() previously
+   * hardcoded to True rather than reading from here -- see that
+   * file's own note on the fix). Server default (unset) is True,
+   * matching the PC's own default and this field's prior hardcoded
+   * behavior, so omitting it is backward compatible. */
+  elimination_ai_only_continue?: boolean;
+  /** Embedded MSOMI model dict (core/msomi_trainer.save_model's
+   * format) -- see server/game_room.py's __init__ for why this is
+   * embedded rather than a filename (the trained model lives on the
+   * PLAYER's own device, not the server). Validated server-side;
+   * silently ignored (falls back to plain AI) if invalid. */
+  ai_msomi_model?: Record<string, unknown>;
+  /** Display label for ai_msomi_model, shown in settings_summary_rows()
+   * -- purely cosmetic, has no effect on gameplay. */
+  ai_msomi_model_label?: string;
+>>>>>>> 399e25e (Kadi Web Dev 1)
   [key: string]: unknown;
 }
 

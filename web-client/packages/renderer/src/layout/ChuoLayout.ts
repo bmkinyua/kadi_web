@@ -26,6 +26,7 @@
  * Rules/GameTable, same as scenes.py's own module-level scroll-bounce
  * helpers are shared across ChuoScene there.
  *
+<<<<<<< HEAD
  * NOT PORTED THIS PASS: the Help overlay (`HelpOverlay`/
  * `HELP_SECTIONS`) and its MSOMI-attach illustration splice. Chuo's
  * four tabs are fully functional without it; the overlay is pure
@@ -34,6 +35,15 @@
  * against this scene's own HELP_SECTIONS copy. Flagged here (and in
  * KADI_web_port_implementation_plan.md's §9 Chuo row) as a deliberate
  * scope cut for this delivery, not an oversight.
+=======
+ * HELP OVERLAY: ported in a later pass (this delivery), closing the
+ * scope cut noted below when this file was first written. See
+ * HelpOverlay.ts/layout/HelpOverlayLayout.ts/layout/HELP_CONTENT.ts
+ * (CHUO_HELP) and this scene's own header. NOT included: the MSOMI-
+ * attach illustration splice (`help_msomi_attach.png`) -- flagged,
+ * not silently dropped, in HELP_CONTENT.ts's own header (no image-
+ * asset pipeline exists anywhere in this web client yet).
+>>>>>>> 399e25e (Kadi Web Dev 1)
  */
 import type { SafeAreaInsets } from '@kadi/adapter-interface';
 import { type Viewport, computeLayoutScale, enforceMinTouchTarget, fontPx } from './scale.js';

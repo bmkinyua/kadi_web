@@ -25,9 +25,16 @@
  *     (validateModel()) and shows its weights, which is genuinely
  *     useful on its own for a player checking what they trained.
  *
+<<<<<<< HEAD
  * WHAT'S DELIBERATELY NOT PORTED THIS PASS: the Help overlay — see
  * layout/ChuoLayout.ts's own header for why, and §9 for the tracked
  * follow-up. NumberBox click-to-focus + keyboard digit entry (from
+=======
+ * HELP OVERLAY: ported in a later pass (this delivery) -- see
+ * HelpOverlay.ts and layout/ChuoLayout.ts's own header for what's
+ * still not included (the MSOMI-attach illustration).
+ * NumberBox click-to-focus + keyboard digit entry (from
+>>>>>>> 399e25e (Kadi Web Dev 1)
  * SettingsScene.ts's own pattern) is also simplified to +/- steppers
  * only here — Chuo's two numeric fields (human weight 1-10, training
  * iterations 50-3000 step 50) are coarse enough that steppers alone
@@ -55,6 +62,11 @@ import {
 } from './layout/ChuoLayout.js';
 import type { RectLayout } from './layout/InternetLobbyLayout.js';
 import { scrollWheelDelta, settleScroll, type ScrollBounce } from './layout/scrollPhysics.js';
+<<<<<<< HEAD
+=======
+import { HelpOverlay } from './HelpOverlay.js';
+import { CHUO_HELP } from './layout/HELP_CONTENT.js';
+>>>>>>> 399e25e (Kadi Web Dev 1)
 import {
   MsomiTrainingError,
   TRAINABLE_FEATURES,
@@ -111,6 +123,10 @@ export class ChuoScene extends Phaser.Scene {
   private dragging = false;
   private dragPointerId: number | null = null;
   private dragLastY = 0;
+<<<<<<< HEAD
+=======
+  private helpOverlay!: HelpOverlay;
+>>>>>>> 399e25e (Kadi Web Dev 1)
 
   // Data tab state
   private logFiles: { id: string; name: string; size: number; importedAt: number }[] = [];
@@ -192,6 +208,15 @@ export class ChuoScene extends Phaser.Scene {
     this.clipMask = this.make.graphics(undefined, false);
     this.content.setMask(this.clipMask.createGeometryMask());
 
+<<<<<<< HEAD
+=======
+    // Help Overlay -- ported from scenes.ChuoScene.HELP_SECTIONS
+    // (deferred by that screen's own original delivery, picked up
+    // here -- see HELP_CONTENT.ts).
+    this.helpOverlay = new HelpOverlay(this, this.adapter, CHUO_HELP);
+    this.helpOverlay.create();
+
+>>>>>>> 399e25e (Kadi Web Dev 1)
     this.render();
     void this.refreshLogFiles();
     void this.refreshSavedModels();
@@ -213,9 +238,17 @@ export class ChuoScene extends Phaser.Scene {
     this.input.off(Phaser.Input.Events.POINTER_MOVE, this.handlePointerMove, this);
     this.input.off(Phaser.Input.Events.POINTER_UP, this.handleDragEnd, this);
     this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.handleDragEnd, this);
+<<<<<<< HEAD
   }
 
   update(_time: number, delta: number): void {
+=======
+    this.helpOverlay.destroy();
+  }
+
+  update(_time: number, delta: number): void {
+    this.helpOverlay.update(delta);
+>>>>>>> 399e25e (Kadi Web Dev 1)
     let needsRender = false;
 
     const scrollOffset = this.scrollOffsetByTab[this.activeTab];
@@ -261,7 +294,11 @@ export class ChuoScene extends Phaser.Scene {
   // ── Scroll input (identical pattern to SettingsScene.ts) ──────────
 
   private handleWheel(pointer: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number): void {
+<<<<<<< HEAD
     if (this.dragging || this.currentFlow == null) return;
+=======
+    if (this.dragging || this.helpOverlay.isOpen || this.currentFlow == null) return;
+>>>>>>> 399e25e (Kadi Web Dev 1)
     pointer.event?.preventDefault();
     this.scrollBounce = null;
     const offset = this.scrollOffsetByTab[this.activeTab];
@@ -275,6 +312,10 @@ export class ChuoScene extends Phaser.Scene {
   }
 
   private handleDragStart(pointer: Phaser.Input.Pointer): void {
+<<<<<<< HEAD
+=======
+    if (this.helpOverlay.isOpen) return;
+>>>>>>> 399e25e (Kadi Web Dev 1)
     if (this.dragPointerId !== null) return;
     if (!this.isWithinViewportBand(pointer)) return;
     this.dragging = true;
@@ -299,6 +340,10 @@ export class ChuoScene extends Phaser.Scene {
   }
 
   private handleResize(): void {
+<<<<<<< HEAD
+=======
+    this.helpOverlay.layout();
+>>>>>>> 399e25e (Kadi Web Dev 1)
     this.render();
   }
 
