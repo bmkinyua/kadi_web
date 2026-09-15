@@ -10,9 +10,14 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev:web-pwa": "npm run dev -w apps/web-pwa",
-    "build:web-pwa": "npm run build -w apps/web-pwa"
+    "build:web-pwa": "npm run build -w apps/web-pwa",
+    "test": "npm run test -w packages/renderer && npm run test -w packages/client-core && npm run test -w adapters/web",
+    "test:unit": "npm run test -w packages/renderer",
+    "test:integration": "npm run test -w packages/client-core",
+    "test:persistence": "npm run test -w adapters/web"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "tsx": "^4.23.13",
     "typescript": "^5.6.3"
   }

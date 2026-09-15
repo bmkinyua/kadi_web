@@ -3,6 +3,7 @@ KADI Card Game - Constants, Colors, and Enums
 """
 import os
 import sys
+import pygame
 from enum import Enum, auto
 from typing import Tuple
 

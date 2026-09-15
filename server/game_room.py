@@ -55,6 +55,7 @@ from core.game_manager import GameManager, GameEvent
 from core import msomi_trainer
 from network.codec import cards_from_list, suit_from_str
 from network.state_sync import build_snapshot_for
+from network.game_summary import build_game_summary_for
 from network.event_codec import encode_event
 from network.settings_summary import apply_rule_settings, build_rule_rows
 from network.player_names import disambiguate_names
@@ -212,6 +213,50 @@ class GameRoom:
             return None
         return self._conn_by_seat.get(winner.player_id)
 
+    # ── game summary (Profile Part 5 disclosure) ───────────────────────────
+    def _mode_and_difficulty(self) -> Tuple[str, Optional[str]]:
+        """core.game_manager.check_badges_after_game's `mode`/
+        `difficulty` inputs have no server-side equivalent to read off
+        GameManager directly (see network/game_summary.py's docstring)
+        -- this room is the one place that actually knows how it was
+        set up. self.member_names never shrinks after start_game() (a
+        mid-game disconnect/evict touches _seat_by_conn/gm state, not
+        this dict -- see mark_disconnected/_evict/reconnect above), so
+        its length is a stable "how many humans were ever seated here"
+        count for the whole match, not just its current size.
+
+        Deliberate interpretation, not something existing code already
+        decided: a room that only ever had ONE human (the rest AI
+        seats, i.e. this browser's own "Play vs AI" quick-match --
+        see LobbyScene.ts's create_game(ai_count: 1, ...)) is treated
+        as the PC's 'single_player'/'single_player_elimination', with
+        this room's own configured AI difficulty -- matching what
+        those PC-side badges (beat_hard, finish_question_chain, ...)
+        actually mean regardless of which server infrastructure ran
+        the match. Two or more humans is real Internet Multiplayer --
+        'internet', no difficulty (mirrors finalize_profile_stats:
+        difficulty is only ever read for the single_player* modes)."""
+        if len(self.member_names) <= 1:
+            mode = 'single_player_elimination' if self.gm.elimination_mode else 'single_player'
+            difficulty = str(self.settings.get('ai_difficulty', 'MEDIUM')).upper()
+            return mode, difficulty
+        return 'internet', None
+
+    def game_summary_for(self, conn_id: int) -> Optional[dict]:
+        """Companion to snapshot_for() -- the one-time 'game_summary'
+        payload for this connection's own seat, or None if it isn't
+        (or was never) a seated player of this room. Only meaningful
+        once self.gm.state == GAME_OVER -- see
+        network/game_summary.build_game_summary_for's own docstring;
+        callers (server/kadi_server.py's tick()) only ever call this
+        at that exact transition, the same guard snapshot_for's own
+        GAME_OVER case already documents relying on."""
+        seat = self._seat_by_conn.get(conn_id)
+        if seat is None:
+            return None
+        mode, difficulty = self._mode_and_difficulty()
+        return build_game_summary_for(self.gm, seat, mode=mode, difficulty=difficulty)
+
     # ── lobby ──────────────────────────────────────────────────────────────
     def roster(self) -> List[dict]:
         # player_id here is the connection's own stable, globally
@@ -266,7 +311,8 @@ class GameRoom:
             ("Elimination Mode", "ON" if elimination_mode else "OFF"),
         ]
         if elimination_mode:
-            rows.append(("  AI continues alone", "ON"))  # see start_game(): always True
+            ai_only_continue = bool(self.settings.get('elimination_ai_only_continue', True))
+            rows.append(("  AI continues alone", "ON" if ai_only_continue else "OFF"))
         rows.extend(build_rule_rows(self.gm))
         ai_count = int(self.settings.get('ai_count', 0) or 0)
         ai_difficulty = str(self.settings.get('ai_difficulty', 'MEDIUM')).title()
@@ -319,8 +365,18 @@ class GameRoom:
                                if conn_id in self._token_by_conn}
 
         self.gm.subscribe(self._on_event)
-        self.gm.new_game(configs, elimination_mode=bool(self.settings.get('elimination_mode')),
-                         elimination_ai_only_continue=True)
+        # elimination_ai_only_continue: previously hardcoded True here
+        # regardless of what a client sent, even though
+        # GameManager.new_game() has accepted this parameter all
+        # along (core/game_manager.py) -- found while investigating
+        # web GameConfigScene parity (this room's own
+        # settings_summary_rows() already assumed True unconditionally
+        # too, in its "AI continues alone" row below). True remains
+        # the default when the key is absent, so this is backward
+        # compatible with every existing client that never set it.
+        self.gm.new_game(
+            configs, elimination_mode=bool(self.settings.get('elimination_mode')),
+            elimination_ai_only_continue=bool(self.settings.get('elimination_ai_only_continue', True)))
         if self._msomi_model is not None:
             # Attaching post-construction (rather than threading a
             # model dict through GameManager.new_game()'s own

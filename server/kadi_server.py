@@ -123,11 +123,30 @@ class KadiServer:
                     winner_conn = self.conns.get_conn(winner_conn_id) if winner_conn_id is not None else None
                     identity_key = (winner_conn.external_id if winner_conn else None) or name
                     self.leaderboard.record_win(identity_key, name, room.gm.game_id)
+                # One-time 'game_summary' per seated human (Profile
+                # Part 5 disclosure -- see network/game_summary.py and
+                # server/game_room.py's game_summary_for()) -- fired
+                # from this exact GAME_OVER transition, the same "only
+                # the first time we see this room in this state" spot
+                # the leaderboard win-count increment above already
+                # relies on (this whole block only ever runs once per
+                # room: `room.closed = True` a few lines down means the
+                # `if not room.started or room.closed: continue` guard
+                # at the top of this loop skips it on every later
+                # tick). A personalized message per connection, not one
+                # shared broadcast payload -- each recipient's own
+                # per-player tally must never leak into another
+                # player's game_summary (see game_summary_for's own
+                # docstring on why the wire shape is per-recipient).
+                for conn_id in room.conn_ids():
+                    summary = room.game_summary_for(conn_id)
+                    if summary is not None:
+                        self.conns.send_to(conn_id, summary)
                 # The final state_sync already carries everything a
-                # client needs (winner_id/finish_order_ids) -- no
-                # reconnect/resume is in scope (see server/README.md),
-                # so the room can be dropped immediately rather than
-                # lingering.
+                # client needs for the table UI itself (winner_id/
+                # finish_order_ids) -- no reconnect/resume is in scope
+                # (see server/README.md), so the room can be dropped
+                # immediately rather than lingering.
                 room.closed = True
                 self.lobby.remove(room.game_id)
 

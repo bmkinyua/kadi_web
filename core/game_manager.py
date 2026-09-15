@@ -165,6 +165,15 @@ class GameManager:
         # a live toggle rather than deleted, in case that decision changes.
         self.ads_enabled: bool = False
 
+        # Card animations (play-to-discard, draw-from-deck, initial
+        # deal, jump-in counters, penalty-draw stacks — see
+        # animation/animator.py's AnimationManager and this scene's
+        # wiring in GameplayScene). Defaults on: this is the intended
+        # game feel, not a debug feature — off is for players who
+        # prefer snappier/instant card resolution, or find motion
+        # distracting.
+        self.card_animations_enabled: bool = True
+
         # Runtime state
         self.state: GameState = GameState.MAIN_MENU
         self.direction: PlayDirection = PlayDirection.CLOCKWISE
@@ -704,6 +713,7 @@ class GameManager:
         self.declared_kadi_player = player
         if player.is_human:
             self._g_kadi_declarations += 1
+            self._player_tally(player.player_id)['kadi_declarations'] += 1
         self._emit(GameEvent('kadi_declared', player=player))
         return True
 
@@ -964,25 +974,34 @@ class GameManager:
         # successful play (leading or answering) funnels through, rather
         # than scattered across each specific play path.
         if player.is_human:
+            pt = self._player_tally(player.player_id)
             self._g_cards_played += len(cards)
+            pt['cards_played'] += len(cards)
             for c in cards:
                 if c.card_type == CardType.SUIT_CHANGE:
                     self._g_aces_played += 1
+                    pt['aces_played'] += 1
                 elif c.card_type == CardType.JUMP:
                     self._g_jump_skips_dealt += 1
+                    pt['jump_skips_dealt'] += 1
                 elif c.card_type == CardType.KICKBACK:
                     self._g_kickback_reversals += 1
+                    pt['kickback_reversals'] += 1
             if result.get('shielded'):
                 blocked = pre_state['pickup_pending']
                 self._g_ace_shield_uses += 1
                 self._g_ace_shield_biggest = max(self._g_ace_shield_biggest, blocked)
+                pt['ace_shield_uses'] += 1
+                pt['ace_shield_biggest'] = max(pt['ace_shield_biggest'], blocked)
             if declare_kadi:
                 self._g_kadi_declarations += 1
+                pt['kadi_declarations'] += 1
                 # "The Trap" (Kuficha Joker): playing a held pickup card
                 # AND declaring KADI in the same move.
                 if any(c.card_type in (CardType.PICKUP_2, CardType.PICKUP_3, CardType.JOKER)
                        for c in cards):
                     self._g_kuficha_trap_attempted = True
+                    pt['kuficha_trap_attempted'] = True
                 # "Poker Face": a lone ACE finishing move (leaves exactly
                 # one card behind) where the requested suit ISN'T that
                 # remaining card's own suit — a genuine decoy request,
@@ -993,8 +1012,10 @@ class GameManager:
                         and player.hand.cards[0].suit is not None
                         and declared_suit != player.hand.cards[0].suit):
                     self._g_bluff_attempted = True
+                    pt['bluff_attempted'] = True
             if len(player.hand.cards) == 1:
                 self._g_near_kadi_count += 1
+                pt['near_kadi_count'] += 1
 
         if result['skip'] and 0 < j_count < len(cards):
             self._jump_bundle = {
@@ -1162,6 +1183,7 @@ class GameManager:
         self.declared_kadi_player = player
         if player.is_human:
             self._g_kadi_declarations += 1
+            self._player_tally(player.player_id)['kadi_declarations'] += 1
         self._emit(GameEvent('kadi_declared', player=player))
         self._close_post_play(declare_kadi=True)
         return True
@@ -1244,6 +1266,8 @@ class GameManager:
         self._g_undo_used = True
         snap = self._undo_snapshot
         player = snap['player']
+        if player.is_human:
+            self._player_tally(player.player_id)['undo_used'] = True
 
         player.hand._cards = list(snap['hand_cards'])
         self.deck._draw_pile = list(snap['draw_pile'])
@@ -1308,7 +1332,23 @@ class GameManager:
         exactly once, in finalize_profile_stats() at game end. Only
         human-attributed actions are counted — see the is_human guards
         at each increment site — matching how mode/difficulty stats are
-        already only ever credited to "my_player"."""
+        already only ever credited to "my_player".
+
+        self._g_by_player (added alongside the pre-existing aggregate
+        self._g_* scalars above, which are UNCHANGED and still what
+        finalize_profile_stats()/the PC single-profile-per-device path
+        reads) is a per-player_id breakdown of the same tallies. It
+        exists because these scalars sum EVERY is_human player's
+        actions together — correct for the PC's single-human-per-
+        device assumption (finalize_profile_stats's own docstring: for
+        hot-seat, crediting every local human's result to one shared
+        profile.json is deliberate), but wrong for the internet
+        server, where GameManager is authoritative for MULTIPLE human
+        players each on their own device with their own separate
+        profile (see server/game_room.py) — summing would attribute
+        one player's cards/aces/etc. to every other human player's own
+        profile. See network/game_summary.py, the one consumer of
+        this per-player breakdown."""
         self._g_cards_played = 0
         self._g_cards_drawn = 0
         self._g_biggest_pickup_absorbed = 0
@@ -1324,6 +1364,26 @@ class GameManager:
         self._g_jump_chain_depth_max = 0
         self._g_bluff_attempted = False    # see "Poker Face" detection in _finish_play
         self._g_kuficha_trap_attempted = False  # see "The Trap" detection in _finish_play
+        self._g_by_player: dict = {}
+
+    def _player_tally(self, player_id: int) -> dict:
+        """Per-player_id counterpart to the aggregate self._g_* scalars
+        (see _reset_game_trackers's docstring) — created lazily on
+        first touch so a player who genuinely never took an action
+        that increments any of these (shouldn't happen in a finished
+        game, but not assumed) simply reads back all-zero/False
+        defaults rather than a KeyError."""
+        t = self._g_by_player.get(player_id)
+        if t is None:
+            t = {
+                'cards_played': 0, 'cards_drawn': 0, 'biggest_pickup_absorbed': 0,
+                'kadi_declarations': 0, 'aces_played': 0, 'jump_skips_dealt': 0,
+                'kickback_reversals': 0, 'ace_shield_uses': 0, 'ace_shield_biggest': 0,
+                'near_kadi_count': 0, 'undo_used': False,
+                'bluff_attempted': False, 'kuficha_trap_attempted': False,
+            }
+            self._g_by_player[player_id] = t
+        return t
 
     def finalize_profile_stats(self, *, mode: str, difficulty: Optional[str] = None,
                                 my_player: Optional[Player] = None) -> List[str]:
@@ -1467,6 +1527,9 @@ class GameManager:
             if player.is_human:
                 self._g_cards_drawn += count
                 self._g_biggest_pickup_absorbed = max(self._g_biggest_pickup_absorbed, count)
+                pt = self._player_tally(player.player_id)
+                pt['cards_drawn'] += count
+                pt['biggest_pickup_absorbed'] = max(pt['biggest_pickup_absorbed'], count)
             game_log.info(f"{player.name} forced to draw {count} cards (pickup): {cards}")
             if player.has_declared_kadi:
                 player.has_declared_kadi = False
@@ -1502,6 +1565,7 @@ class GameManager:
             player.hand.add([card])
             if player.is_human:
                 self._g_cards_drawn += 1
+                self._player_tally(player.player_id)['cards_drawn'] += 1
             # This used to be the ONE turn-action with no game_log line at
             # all — a forced pickup draw logs, an AI's decision logs, but a
             # plain voluntary draw (by a human OR an AI) left nothing in

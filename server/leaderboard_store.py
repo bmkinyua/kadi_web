@@ -59,6 +59,14 @@ credentials exist yet either. Until that verification lands, treat
 `external_id`-keyed entries as "not spoofable by retyping a name" but
 NOT yet as "cryptographically verified" -- an honest middle ground
 between today's pure name-keying and a fully verified identity system.
+
+REGRESSION NOTE: this file was found fully reverted to its
+pre-identity-key form (flat name->int wins, 2-arg record_win/rank_for)
+during the Settings-screen delivery, despite server/kadi_server.py
+still correctly calling the 3-arg identity-key form -- a real crash on
+every completed Internet Multiplayer game, caught and fixed then. If
+this file is ever touched again working from an older snapshot,
+diff it against server/kadi_server.py's actual call sites first.
 """
 from __future__ import annotations
 import json
@@ -67,28 +75,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 LEADERBOARD_FILENAME = "leaderboard.json"
 
-# How many recently-credited game_ids to remember for the exactly-once
-# increment guard (see record_win) -- reusing the same "must fire
-# exactly once per finished game" requirement
-# core.game_manager.GameManager._stats_recorded_for_game_id exists for
-# (that one guards one GameManager instance; this guards the server's
-# whole set of concurrent rooms, so it's a list of ids rather than a
-# single attribute). A room is dropped from the Lobby the instant its
-# game reaches GAME_OVER (see server/kadi_server.py's tick()), so in
-# practice a given game_id is only ever offered to record_win once --
-# this is belt-and-braces against any future code path that might call
-# it again, not a response to an observed bug. Capped so the file
-# doesn't grow forever across a long-running server's lifetime.
 MAX_RECORDED_GAME_IDS = 2000
 
 
 def _default_store() -> Dict[str, Any]:
     return {
-        # identity_key -> {"name": last-seen display name, "count": wins}.
-        # identity_key is "{platform}:{external_id}" when the winning
-        # connection had one, otherwise the display name itself
-        # (exactly today's pre-identity-key behavior) -- see this
-        # module's docstring.
         "wins": {},
         "recorded_game_ids": [],
     }
@@ -120,13 +111,6 @@ class LeaderboardStore:
 
     @staticmethod
     def _migrate_wins(wins: Dict[str, Any]) -> Dict[str, Any]:
-        """Upgrade any pre-identity-key entries (plain int win counts,
-        keyed directly by display name -- the only shape this file
-        ever had before) into the current {"name", "count"} shape, in
-        place. A file that's already current just passes through
-        unchanged. This runs on every load, not as a one-off migration
-        script, so a leaderboard.json from before this change keeps
-        working with zero manual steps."""
         migrated = {}
         for key, value in wins.items():
             if isinstance(value, dict):
@@ -135,7 +119,6 @@ class LeaderboardStore:
                     "count": int(value.get("count", 0)),
                 }
             else:
-                # Legacy shape: key WAS the display name, value WAS the count.
                 migrated[key] = {"name": key, "count": int(value)}
         return migrated
 
@@ -146,22 +129,9 @@ class LeaderboardStore:
                 json.dump(self._data, f, indent=2)
             os.replace(tmp, self._path)
         except OSError:
-            pass  # persistence is best-effort -- in-memory counts stay correct regardless
+            pass
 
     def record_win(self, identity_key: str, display_name: str, game_id: str) -> bool:
-        """Increment `identity_key`'s win count (creating it, remembering
-        `display_name` for display, if this is its first win), unless
-        `game_id` has already been recorded (exactly-once guard -- see
-        class docstring). Returns True if this call actually
-        incremented anything.
-
-        `identity_key` is "{platform}:{external_id}" for a connection
-        that had one, or `display_name` itself otherwise -- see this
-        module's docstring for what that does and doesn't guarantee.
-        `display_name` is stored separately and refreshed on every win
-        so a later name change shows up on the leaderboard without
-        losing win history tied to the stable key.
-        """
         if not identity_key or not display_name or not game_id:
             return False
         recorded = self._data['recorded_game_ids']
@@ -181,28 +151,14 @@ class LeaderboardStore:
         return True
 
     def _ranked(self) -> List[Tuple[str, str, int]]:
-        # (identity_key, display_name, count), ties broken alphabetically
-        # by display name (case-insensitive) so top() and rank_for()
-        # always agree on ordering.
         items = [(key, entry["name"], entry["count"]) for key, entry in self._data['wins'].items()]
         return sorted(items, key=lambda t: (-t[2], t[1].lower()))
 
     def top(self, n: int = 20) -> List[Tuple[str, int]]:
-        """(display_name, count) pairs -- unchanged external shape, so
-        every existing caller (server/kadi_server.py's 'get_leaderboard'
-        handling) needs no changes even though entries are now keyed
-        internally by identity_key rather than name."""
         return [(name, count) for _key, name, count in self._ranked()[:max(1, n)]]
 
     def rank_for(self, identity_key: str) -> Optional[Tuple[int, int]]:
-        """(1-based rank, win count) for `identity_key`, or None if it
-        has no recorded wins yet. Callers now pass the same
-        identity_key record_win() was given -- see
-        server/kadi_server.py's 'get_my_rank' handling -- not a raw
-        display name, since two different people can share a display
-        name but never a real identity_key."""
         for i, (key, _name, count) in enumerate(self._ranked(), start=1):
             if key == identity_key:
                 return i, count
         return None
-

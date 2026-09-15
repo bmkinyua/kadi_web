@@ -1,0 +1,154 @@
+{
+  "decisions": [
+    {
+      "schema_version": 1,
+      "game_id": "g1",
+      "is_human": true,
+      "player_name": "p",
+      "difficulty": "MEDIUM",
+      "hand_before": [],
+      "hand_count": 5,
+      "top_card": null,
+      "pickup_pending": 0,
+      "declared_kadi": false,
+      "chosen_rank": 0,
+      "num_options": 2,
+      "options": [
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 2,
+          "empties_hand": true
+        },
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 1,
+          "empties_hand": false
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "game_id": "g1",
+      "is_human": false,
+      "player_name": "p",
+      "difficulty": "MEDIUM",
+      "hand_before": [],
+      "hand_count": 5,
+      "top_card": null,
+      "pickup_pending": 0,
+      "declared_kadi": false,
+      "chosen_rank": 1,
+      "num_options": 2,
+      "options": [
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 1,
+          "empties_hand": false
+        },
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 3,
+          "empties_hand": true
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "game_id": "g1",
+      "is_human": true,
+      "player_name": "p",
+      "difficulty": "MEDIUM",
+      "hand_before": [],
+      "hand_count": 5,
+      "top_card": null,
+      "pickup_pending": 0,
+      "declared_kadi": false,
+      "chosen_rank": 1,
+      "num_options": 3,
+      "options": [
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 0,
+          "empties_hand": false
+        },
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 2,
+          "empties_hand": true
+        },
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 1,
+          "empties_hand": false
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "game_id": "g1",
+      "is_human": false,
+      "player_name": "p",
+      "difficulty": "MEDIUM",
+      "hand_before": [],
+      "hand_count": 5,
+      "top_card": null,
+      "pickup_pending": 0,
+      "declared_kadi": false,
+      "chosen_rank": 0,
+      "num_options": 2,
+      "options": [
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 4,
+          "empties_hand": true
+        },
+        {
+          "cards": null,
+          "is_draw": false,
+          "score": 0,
+          "cards_played": 1,
+          "empties_hand": false
+        }
+      ]
+    }
+  ],
+  "model": {
+    "schema_version": 1,
+    "decision_schema_version": 1,
+    "model_type": "conditional_logit",
+    "features": [
+      "cards_played",
+      "empties_hand"
+    ],
+    "weights": {
+      "cards_played": 2.9613508885800273,
+      "empties_hand": 2.433013508379743
+    },
+    "training": {
+      "num_decisions": 4,
+      "num_human_decisions": 2,
+      "num_ai_decisions": 2,
+      "human_weight": 2.0,
+      "iterations": 500,
+      "learning_rate": 0.3,
+      "train_agreement": 1.0,
+      "train_agreement_human_only": 1.0
+    }
+  }
+}

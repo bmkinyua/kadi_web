@@ -5,7 +5,15 @@
   "type": "module",
   "main": "./src/WebAdapter.ts",
   "types": "./src/WebAdapter.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
     "@kadi/adapter-interface": "*"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "tsx": "^4.23.13",
+    "vitest": "^2.1.9"
   }
 }

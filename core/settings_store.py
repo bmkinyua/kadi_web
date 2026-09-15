@@ -55,6 +55,7 @@ DEFAULTS: Dict[str, Any] = {
     # direct-sold sponsorship (the one ad-adjacent option Steam's policy
     # still allows) is ever pursued.
     'ads_enabled':                False,
+    'card_animations_enabled':   True,
 }
 
 
@@ -118,3 +119,28 @@ def reset_to_defaults(gm):
     immediately, so 'Reset to Defaults' is itself durable."""
     apply_settings_dict(gm, DEFAULTS)
     save_settings(gm)
+
+
+def load_persisted_value(key: str) -> Any:
+    """Read a single persisted setting straight from disk, without
+    needing a full GameManager-shaped object to apply it onto (unlike
+    load_settings/apply_settings_dict above, which end by calling
+    gm.set_log_level(...) — real-GameManager-only). Used by
+    network/client_state.ClientGameManager for settings that are a
+    purely local, per-viewer display preference and therefore never
+    part of the host's authoritative state — never carried in a
+    snapshot, so a client has nowhere else to source them from.
+
+    Returns DEFAULTS[key] if there's no settings file yet, the file is
+    unreadable, or the key isn't present in it."""
+    default = DEFAULTS.get(key)
+    path = _settings_path()
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get(key, default)
+    except Exception as e:
+        game_log.info(f"Failed to load persisted setting '{key}' ({e}) — using default")
+        return default

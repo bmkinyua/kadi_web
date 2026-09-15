@@ -25,6 +25,53 @@ from typing import Dict, List, Optional
 from constants import GameState, PlayDirection, AIDifficulty
 from network.codec import card_to_dict, cards_to_list
 from models.player import AIPlayer
+from models.card import Card
+
+# Same placeholder convention network/client_state.py already uses to
+# fill a redacted opponent hand's card *contents* (only the count is
+# real) — reused here so "what a hidden card looks like on the wire"
+# never drifts between the two redaction sites.
+_HIDDEN_CARD = {'__card__': card_to_dict(Card(suit=None, rank='2'))}
+
+
+def _redact_events_for(events: List[dict], recipient_id: int) -> List[dict]:
+    """Strip the real card identity from any event about a DRAW into a
+    still-hidden hand — 'card_drawn' and 'pickup_drawn' — when it's not
+    the recipient's own draw. Both are encoded by the same generic
+    network/event_codec.encode_event() that every other event kind
+    uses, which has no idea who's about to receive the result, so it
+    faithfully encodes whatever the real GameEvent carried — including,
+    for these two kinds, the actual Card(s) that landed in a hand
+    nobody but its owner should ever see the contents of. This is
+    intentionally NOT done in encode_event itself, which runs once per
+    event, before any recipient is known — the per-recipient decision
+    belongs here, in the one function already responsible for that
+    boundary for hand contents (see the module docstring's PRIVACY
+    BOUNDARY note above).
+
+    'cards_played' and 'jump_countered' are deliberately left alone —
+    playing a card is what makes it public in the first place, so
+    there's nothing to redact.
+    """
+    if not events:
+        return events
+    out = []
+    for enc in events:
+        if enc.get('kind') not in ('card_drawn', 'pickup_drawn'):
+            out.append(enc)
+            continue
+        fields = enc.get('fields', {})
+        mover_id = fields.get('player', {}).get('__player_id__')
+        if mover_id == recipient_id:
+            out.append(enc)
+            continue
+        redacted_fields = dict(fields)
+        if 'card' in redacted_fields:
+            redacted_fields['card'] = _HIDDEN_CARD
+        if 'cards' in redacted_fields:
+            redacted_fields['cards'] = [_HIDDEN_CARD for _ in redacted_fields['cards']]
+        out.append({'kind': enc['kind'], 'fields': redacted_fields})
+    return out
 
 
 def build_snapshot_for(gm, recipient_id: int, events: Optional[List[dict]] = None) -> dict:
@@ -37,7 +84,11 @@ def build_snapshot_for(gm, recipient_id: int, events: Optional[List[dict]] = Non
     network/event_codec.encode_event) emitted since the last snapshot
     sent to this recipient — see network/host_game.py, which buffers
     them between broadcasts so nothing emitted between two network
-    ticks is ever silently dropped.
+    ticks is ever silently dropped. Card identities for a DRAW into
+    someone else's still-hidden hand are redacted per-recipient here
+    (see _redact_events_for) before going out — the shared `events`
+    list itself is never mutated, so redacting it for one recipient
+    can't affect what the next recipient in the same broadcast sees.
     """
     re = gm.rule_engine
     players = []
@@ -113,6 +164,6 @@ def build_snapshot_for(gm, recipient_id: int, events: Optional[List[dict]] = Non
         'hints_enabled': gm.hints_enabled,
         'hint_threshold_pct': gm.hint_threshold_pct,
         'undo_available': False,  # undo is host-local only — see network/README.md
-        'events': events or [],
+        'events': _redact_events_for(events or [], recipient_id),
     }
 

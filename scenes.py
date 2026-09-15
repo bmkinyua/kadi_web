@@ -516,6 +516,93 @@ class AudioControls:
         draw_icon(surf, self._btn_music.rect, 'music_on' if music_on else 'music_off', WHITE)
 
 
+class ContactBar:
+    """Developer contact icons (Twitter/X, Email, LinkedIn) — drawn as
+    a small row bottom-right on the Main Menu, mirroring the version
+    string's bottom-left placement (see MainMenuScene.draw) so the two
+    sit on the same footer baseline and form one balanced row at every
+    resolution, the same way AudioControls/WindowControls above stay
+    paired top-right. Deliberately scoped to just the Main Menu rather
+    than threaded through every scene like AudioControls — a personal/
+    social contact point belongs on the title screen, not floating over
+    gameplay.
+
+    URLs live in one place (core.social_share.CONTACT_LINKS) rather
+    than here — this class only turns that list into clickable, scaled
+    icon buttons.
+    """
+
+    BASE_BTN    = 38  # 1280x800-baseline pixel size, scaled by get_chrome_scale
+    BASE_GAP    = 10
+    BASE_MARGIN = 10
+
+    def __init__(self, font: pygame.font.Font, font_tooltip: pygame.font.Font):
+        self._font_tooltip = font_tooltip
+        self._entries: List[Tuple[str, str, str]] = [
+            (key, icon, label) for key, icon, label, _url in social_share.CONTACT_LINKS
+        ]
+        self._buttons: List[Button] = [
+            Button(pygame.Rect(0, 0, 1, 1), "", font,
+                   color=(40, 52, 68), hover_color=(64, 88, 116),
+                   on_click=(lambda k=key: social_share.open_contact_link(k)))
+            for key, _icon, _label in self._entries
+        ]
+
+    def _layout(self, sw: int, sh: int):
+        cs = get_chrome_scale(sw, sh)
+        btn = round(self.BASE_BTN * cs)
+        gap = round(self.BASE_GAP * cs)
+        margin = round(self.BASE_MARGIN * cs)
+        x = sw - margin - btn
+        y = sh - margin - btn
+        # Right-to-left so the row still reads Twitter → Email →
+        # LinkedIn left-to-right once laid out, regardless of iteration
+        # order — matches CONTACT_LINKS' own declared order.
+        for _entry, b in reversed(list(zip(self._entries, self._buttons))):
+            b.rect = pygame.Rect(x, y, btn, btn)
+            x -= (btn + gap)
+
+    def update(self, dt: float, sw: int, sh: int, mouse_pos: Tuple[int, int]):
+        self._layout(sw, sh)
+        for b in self._buttons:
+            b.update(dt, mouse_pos)
+
+    def handle_event(self, event) -> bool:
+        consumed = False
+        for b in self._buttons:
+            if b.handle_event(event):
+                consumed = True
+        return consumed
+
+    def draw(self, surf: pygame.Surface):
+        hovered_label = None
+        for (_key, icon, label), b in zip(self._entries, self._buttons):
+            b.draw(surf)
+            draw_icon(surf, b.rect.inflate(-round(b.rect.width * 0.28),
+                                           -round(b.rect.height * 0.28)),
+                     icon, WHITE, width=2)
+            if b._hovered:
+                hovered_label = (label, b.rect)
+
+        if hovered_label is None:
+            return
+        # Small tooltip above whichever icon is hovered — same
+        # draw_rounded_rect + gold border look as the cosmetic-swatch
+        # tooltip in ProfileScene, for one consistent tooltip style
+        # across the app.
+        label, rect = hovered_label
+        pad = 6
+        text_surf = self._font_tooltip.render(label, True, (235, 235, 235))
+        box_w = text_surf.get_width() + 2 * pad
+        box_h = text_surf.get_height() + 2 * pad
+        bx = min(max(rect.centerx - box_w // 2, 4), surf.get_width() - box_w - 4)
+        by = rect.top - box_h - 6
+        box_rect = pygame.Rect(bx, by, box_w, box_h)
+        draw_rounded_rect(surf, (20, 24, 22, 245), box_rect, 6,
+                          border_color=GOLD_LIGHT, border_width=1)
+        surf.blit(text_surf, (box_rect.x + pad, box_rect.y + pad))
+
+
 # ─── Ad banner slot (placeholder — no real ad network wired in yet) ─────────
 # Scenes on which the banner is eligible to show at all (subject to the
 # ads_enabled setting). Chuo and Settings are deliberately excluded —
@@ -792,6 +879,8 @@ class MainMenuScene(Scene):
         self._help_btn = make_help_button(pygame.Rect(0, 0, 1, 1),
                                           self.assets.font_scaled('ui_small', cs),
                                           on_click=self._help.open)
+        tiny_font = self.assets.font_scaled('ui_tiny', cs)
+        self._contact = ContactBar(tiny_font, tiny_font)
 
     def _layout_help_btn(self, sw: int, sh: int):
         ac = getattr(self.manager, 'audio_controls', None)
@@ -895,6 +984,8 @@ class MainMenuScene(Scene):
         if self._help.handle_event(event, sw, sh):
             return
         self._help_btn.handle_event(event)
+        if self._contact.handle_event(event):
+            return
         for btn in self._buttons:
             btn.handle_event(event)
 
@@ -905,6 +996,7 @@ class MainMenuScene(Scene):
         self._t += dt
         mp = pygame.mouse.get_pos()
         self._help_btn.update(dt, mp)
+        self._contact.update(dt, sw, sh, mp)
         for btn in self._buttons:
             btn.update(dt, mp)
         for star in self._stars:
@@ -957,6 +1049,7 @@ class MainMenuScene(Scene):
 
         ver = self.assets.font_scaled('ui_tiny', cs).render(f"v{VERSION} — Python/Pygame", True, (*WHITE, 80))
         surf.blit(ver, (s(10), sh - s(20)))
+        self._contact.draw(surf)
 
         self._help.draw_button_glow(surf, self._help_btn.rect)
         self._help_btn.draw(surf)
@@ -2405,6 +2498,7 @@ class SettingsScene(Scene):
             ('pickup_shield_qk_allowed', "Question/Kickback+ACE Can Shield Pick-up"),
             ('ace_finisher_enabled',     "ACE Multi-Card Finish"),
             ('jump_multi_card_enabled',  "Jump Multi-Card Play"),
+            ('card_animations_enabled',  "Card Animations"),
         ]
         self._hint_toggle_key = ('hints_enabled', "Card Play Hints")
         self._music_toggle_key = ('music_enabled', "Background Music")
@@ -6283,6 +6377,18 @@ class GameplayScene(Scene):
         # explicitly from the Internet menu flow.
         self._is_internet = is_internet
         self._profile_stats_done = False
+        # See animation/animator.py's AnimationManager + this file's
+        # BoardRenderer.draw_animated_card/draw_piles/draw_hand
+        # suppression params. _anim_suppress_discard hides the discard
+        # pile's top card while a played card is still flying toward
+        # it; _anim_hide_tail[player_id] hides that many trailing cards
+        # from a hand's static render while a drawn/dealt card is still
+        # flying toward one of those slots (always appended at the end
+        # of hand.cards). Both reset to "nothing suppressed" here since
+        # a fresh game/scene entry never has an animation in flight.
+        self._anim_suppress_discard = 0
+        self._anim_hide_tail: Dict[int, int] = {}
+        self._deal_in_progress = False
 
         # network_role is None for ordinary single-player/local-multiplayer
         # games. 'host' means self.gm is the SAME real GameManager the
@@ -6346,6 +6452,7 @@ class GameplayScene(Scene):
             self.gm.new_game(player_configs, elimination_mode=em,
                              elimination_ai_only_continue=eac)
             self.board.setup_layout(len(self.gm.players), sw, sh, top_margin=self._ad_top_pad())
+            self._animate_initial_deal()
         elif kwargs.get('resume'):
             # Game state was already rehydrated by save_manager.load_game()
             # before switching to this scene — just lay the board out for
@@ -6680,13 +6787,19 @@ class GameplayScene(Scene):
         elif event.kind == 'cards_played':
             if event.effect_text: self._add_message(event.effect_text, GOLD_LIGHT)
             self.assets.play_sound('play_card')
+            if self._should_animate_from_event(event.player):
+                self._animate_play(event.player, event.cards)
             self._refresh_playable()
         elif event.kind == 'card_drawn':
             self.assets.play_sound('draw_card')
+            if self._should_animate_from_event(event.player):
+                self._animate_draw(event.player, [event.card])
             self._refresh_playable()
         elif event.kind == 'pickup_drawn':
             self._add_message(f"{event.player.name} picks up {event.count}!", (220,80,80))
             self.assets.play_sound('pickup')
+            if self._should_animate_from_event(event.player):
+                self._animate_draw(event.player, event.cards)
             self._refresh_playable()
         elif event.kind == 'invalid_play':
             self._add_message(f"Invalid: {event.reason}", (220,80,80), duration=1.5)
@@ -6721,6 +6834,8 @@ class GameplayScene(Scene):
         elif event.kind == 'jump_countered':
             self._add_message(f"{event.player.name} countered the Jump!", (255,140,0))
             self.assets.play_sound('counter')
+            if self._should_animate_from_event(event.player):
+                self._animate_play(event.player, event.cards)
         elif event.kind == 'jump_counter_voided_bundle':
             cards_str = " ".join(c.display_ascii for c in event.cards)
             self._add_message(f"Countered! {event.player.name} gets back: {cards_str}",
@@ -7025,6 +7140,188 @@ class GameplayScene(Scene):
 
     # ── Actions ───────────────────────────────────────────────────────────────
 
+    def _should_animate_from_event(self, player) -> bool:
+        """True when a GameEvent-driven call (from _on_game_event) should
+        fire the flight animation for `player`'s move, as opposed to that
+        move already being covered by the direct/instant call made at the
+        point of action (_action_play/_action_draw/_action_counter below).
+        Keeping these two paths mutually exclusive is what prevents a
+        move from animating twice.
+
+        - Local, non-networked games (single-player, hot-seat, AI
+          Spectator Mode): a local human's own move already animates
+          instantly via the direct call the moment they act, gated on
+          `self.gm.current_player is not self._my_player()` there — so
+          this only needs to fire for AI turns (`not player.is_human`).
+          This also correctly covers AI Spectator Mode, where every
+          mover is AI and _my_player() is always None.
+
+        - LAN host: the host's own GameManager is real and local (same
+          process, same as local play), so the host's own move also
+          already animates instantly via the direct call. Every OTHER
+          seat's move — AI, or another connected client's relayed
+          intent — reaches the host only as a GameEvent, so this fires
+          for anyone who isn't the host's own player (seat 0, same
+          fixed-identity convention _my_player() already uses for
+          network roles).
+
+        - Network client: a ClientGameManager never mutates state
+          locally (see its module docstring) — human_play()/human_draw()/
+          human_counter() send an intent and return immediately with no
+          usable success/failure signal (human_draw() in particular
+          can't even know the drawn card's identity before the round
+          trip). There is no reliable instant path here at all, so
+          EVERY move — including our own — is only animated once it
+          comes back confirmed as a GameEvent in the next snapshot; this
+          always returns True for a client, deliberately including our
+          own player_id."""
+        if player is None:
+            return False
+        if self._network_role == 'client':
+            return True
+        if self._network_role == 'host':
+            me = self.gm.players[0] if self.gm.players else None
+            return me is None or player.player_id != me.player_id
+        return not player.is_human
+
+    def _animate_play(self, player, cards):
+        """Fires a play_card flight animation (hand -> discard pile)
+        for each card in `cards` — for the local human's own action
+        (called directly from _action_play/_action_counter) as well as
+        for AI opponents and other network players' moves (called from
+        _on_game_event, gated by _should_animate_from_event so a move
+        never animates from both paths at once). No-ops silently if
+        animations are off or layout isn't available yet — purely
+        visual, never affects the actual play, which by the time this
+        runs has already landed (either applied synchronously by the
+        caller, or confirmed by the snapshot that carried this event)."""
+        if not self.gm.card_animations_enabled:
+            return
+        layout = self.board.get_layout()
+        if not layout:
+            return
+        try:
+            idx = self.gm.players.index(player)
+        except ValueError:
+            return
+        slot = self._hotseat_layout_slot(idx)
+        if slot >= len(layout):
+            return
+        lay = layout[slot]
+        start = (lay['hand_cx'], lay['hand_cy'])
+        drect = self.board.discard_pile_rect()
+        dest = (drect.centerx, drect.centery)
+
+        self._anim_suppress_discard += 1
+
+        def _on_done(ac):
+            self._anim_suppress_discard = max(0, self._anim_suppress_discard - 1)
+
+        for card in cards:
+            self.anim.play_card(card, start, dest, face_up=True, on_complete=_on_done)
+
+    def _animate_draw(self, player, cards):
+        """Fires one draw_card flight animation (deck -> hand) per card
+        in `cards`, staggered slightly so a penalty-pickup stack
+        (Pick 2/Pick 4 chains) visibly lands one card at a time rather
+        than all at once. Takes the actual drawn Card objects (not
+        just a count) since draw_animated_card needs a real Card to
+        render when face_up — but see the face-up derivation below,
+        which never actually reads .card for anyone whose hand isn't
+        the one shown face-up right now (an opponent's true drawn card
+        is present in `cards` — see the callers in _on_game_event —
+        because that's the shape the underlying GameEvent already
+        carries, but it must never be rendered: for a remote opponent
+        specifically, that identity has already technically crossed
+        the wire in the event payload itself, a separate, pre-existing
+        state_sync privacy note worth a follow-up, but this method's
+        job is to make sure nothing here is the first thing to put it
+        on screen).
+
+        Face-up-ness is derived from the render slot's own
+        `face_up` flag (the same one _animate_initial_deal already
+        uses), not hardcoded — slot 0 is always whichever hand is
+        legitimately shown face-up right now (single-player/network:
+        always seat 0 / the locally-rotated "me"; hot-seat: whichever
+        human has actually clicked through the Pass-and-Play reveal;
+        everyone else lands at a non-zero slot and renders face-down).
+        This is correct for both the local human's own draw (the
+        original, direct-call use of this method) and for an AI/
+        opponent's draw fired from _on_game_event — the same
+        board-truth layout already governs ordinary hand rendering, so
+        there's nothing animation-specific to get right here beyond
+        reusing it."""
+        if not self.gm.card_animations_enabled or not cards:
+            return
+        layout = self.board.get_layout()
+        if not layout:
+            return
+        try:
+            idx = self.gm.players.index(player)
+        except ValueError:
+            return
+        slot = self._hotseat_layout_slot(idx)
+        if slot >= len(layout):
+            return
+        lay = layout[slot]
+        dest = (lay['hand_cx'], lay['hand_cy'])
+        drect = self.board.draw_pile_rect()
+        start = (drect.centerx, drect.centery)
+        pid = player.player_id
+        face_up = bool(lay['face_up'])
+
+        self._anim_hide_tail[pid] = self._anim_hide_tail.get(pid, 0) + len(cards)
+
+        def _on_done(ac):
+            self._anim_hide_tail[pid] = max(0, self._anim_hide_tail.get(pid, 0) - 1)
+
+        STAGGER_SECS = 0.09
+        for i, card in enumerate(cards):
+            self.anim.draw_card(card, start, dest, face_up=face_up,
+                                delay=i * STAGGER_SECS, on_complete=_on_done)
+
+    def _animate_initial_deal(self):
+        """Animates the just-completed initial deal (self.gm.new_game()
+        already dealt every hand synchronously by the time this runs —
+        see on_enter) as if it were still happening: hides every
+        player's hand, then reveals it one card at a time via
+        AnimationManager.deal_card (deck -> that seat's hand-center),
+        staggered within each hand. Simplification worth knowing about:
+        this deals one player's whole hand before starting the next,
+        not true round-robin (one card per player, repeated) like a
+        human dealer would — a nicer version of this exists but wasn't
+        worth the extra complexity for a one-time, ~2-second moment.
+        Only called for a genuinely fresh local/hot-seat game start
+        (on_enter's `if player_configs:` branch) — a resumed save or a
+        network join populates hands from elsewhere and would look
+        wrong re-animated as a fresh deal."""
+        if not self.gm.card_animations_enabled:
+            return
+        layout = self.board.get_layout()
+        if not layout:
+            return
+        drect = self.board.draw_pile_rect()
+        start = (drect.centerx, drect.centery)
+        STAGGER_SECS = 0.06
+        for i, player in enumerate(self.gm.players):
+            slot = self._hotseat_layout_slot(i)
+            if slot >= len(layout):
+                continue
+            lay = layout[slot]
+            dest = (lay['hand_cx'], lay['hand_cy'])
+            face_up = bool(lay['face_up'])
+            hand_cards = list(player.hand.cards)
+            pid = player.player_id
+            self._anim_hide_tail[pid] = self._anim_hide_tail.get(pid, 0) + len(hand_cards)
+
+            def _on_done(ac, pid=pid):
+                self._anim_hide_tail[pid] = max(0, self._anim_hide_tail.get(pid, 0) - 1)
+
+            for j, card in enumerate(hand_cards):
+                delay = (i * len(hand_cards) + j) * STAGGER_SECS
+                self.anim.deal_card(card, start, dest, face_up=face_up,
+                                    delay=delay, on_complete=_on_done)
+
     def _action_play(self):
         if self._pending_reveal_target is not None:
             return
@@ -7041,7 +7338,9 @@ class GameplayScene(Scene):
             # into a hand that isn't mine.
             return
         cards = [self.gm.current_player.hand.cards[i] for i in sorted(self._selected)]
-        self.gm.human_play(cards)
+        player = self.gm.current_player
+        if self.gm.human_play(cards):
+            self._animate_play(player, cards)
         self._selected.clear()
         self._refresh_playable()
 
@@ -7052,7 +7351,21 @@ class GameplayScene(Scene):
             return
         if self.gm.current_player is not self._my_player():
             return
-        self.gm.human_draw()
+        player = self.gm.current_player
+        # Captured BEFORE human_draw() — a forced pickup resets
+        # pickup_pending_display to 0 as part of resolving it, so this
+        # is the only chance to know how many cards are about to land
+        # (see core.game_manager._do_draw). 1 for an ordinary voluntary
+        # draw (no pickup pending).
+        n = max(1, self.gm.pickup_pending_display)
+        hand_before = len(player.hand.cards)
+        result = self.gm.human_draw()
+        # None means nothing actually happened (e.g. deck exhausted) —
+        # confirm via hand size too, since _do_draw's own early-outs
+        # aren't all surfaced through the return value.
+        if result is not None and len(player.hand.cards) > hand_before:
+            drawn = player.hand.cards[-n:] if n <= len(player.hand.cards) else list(player.hand.cards)
+            self._animate_draw(player, drawn)
         self._selected.clear()
         self._refresh_playable()
 
@@ -7092,6 +7405,7 @@ class GameplayScene(Scene):
 
         success = self.gm.human_counter(j_cards)
         if success:
+            self._animate_play(cp, j_cards)
             self._selected.clear()
             self._refresh_playable()
         else:
@@ -7692,7 +8006,8 @@ class GameplayScene(Scene):
         self.board.draw_piles(surf,
             self.gm.deck.top_card if self.gm.deck else None,
             self.gm.deck.draw_count if self.gm.deck else 0,
-            self.gm.rule_engine.current_suit)
+            self.gm.rule_engine.current_suit,
+            suppress_top=bool(self._anim_suppress_discard))
         self.board.draw_direction_indicator(surf, self.gm.direction)
 
         # Player hands & info
@@ -7743,7 +8058,8 @@ class GameplayScene(Scene):
             self.board.draw_hand(surf, player, lay, sel, play, hov, is_cur,
                                  drag_idx=di, drag_pos=dp, drag_target=dt2,
                                  hint_idx=hi,
-                                 reveal_override=rev_override)
+                                 reveal_override=rev_override,
+                                 hide_tail=self._anim_hide_tail.get(player.player_id, 0))
             self.board.draw_player_info(surf, player, lay, is_cur, is_kadi, player.score)
 
         # Drawn AFTER every hand/info panel (not before, as it used to
@@ -7753,13 +8069,15 @@ class GameplayScene(Scene):
         # drawn post-hands for the same reason.
         self.board.draw_pickup_indicator(surf, self.gm.pickup_pending_display)
 
-        # Animations
+        # Animations (see animation/animator.py's AnimationManager and
+        # BoardRenderer.draw_animated_card — this used to reference
+        # AnimatedCard fields directly with an unscaled fixed CARD_W/
+        # CARD_H and a raw get_card_surface() call, none of which
+        # actually ran in practice since nothing called play_card/
+        # draw_card/deal_card yet; draw_animated_card is the real,
+        # resolution-scaled version).
         for ac in self.anim.get_active_anims():
-            cs = self.assets.get_card_surface(ac.card, ac.face_up)
-            if ac.scale != 1.0:
-                cs = pygame.transform.smoothscale(cs, (int(CARD_W*ac.scale), int(CARD_H*ac.scale)))
-            cs = cs.copy(); cs.set_alpha(ac.alpha)
-            surf.blit(cs, (int(ac.pos[0]), int(ac.pos[1])))
+            self.board.draw_animated_card(surf, ac)
 
         my_player = self._my_player()
         # NOT just "a human's turn" — in a multi-human LAN/Internet game

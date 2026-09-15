@@ -66,6 +66,39 @@ SHARE_SUBDIR = "KADI Shares"
 GAME_URL = "https://bmkinyua.itch.io/"
 
 
+# ── Developer contact links ──────────────────────────────────────────
+# Same "one place a link lives" reasoning as GAME_URL above -- the Main
+# Menu footer's contact icons (see scenes.py's ContactBar) read this
+# tuple to build their buttons rather than hard-coding URLs at the draw
+# call site, so updating a handle/address later never means hunting
+# through UI code for it. `icon` names a rendering.widgets.draw_icon
+# kind, not a platform label, since the icons are drawn as plain vector
+# glyphs (same cross-platform-glyph reasoning as every other icon in
+# this app) rather than loaded image assets.
+CONTACT_LINKS: Tuple[Tuple[str, str, str, str], ...] = (
+    ("twitter", "twitter", "Twitter/X", "https://twitter.com/BMKinyua"),
+    ("email", "email", "Email", "mailto:thekadigame@gmail.com"),
+    ("linkedin", "linkedin", "LinkedIn",
+     "https://www.linkedin.com/in/blaise-kinyua-20987b47/"),
+)
+
+
+def open_contact_link(key: str) -> bool:
+    """Open a developer contact link (see CONTACT_LINKS) in the
+    person's default browser/mail client via the stdlib webbrowser
+    module -- same best-effort, never-fatal shape as open_share_intent
+    above (a mailto: link with no configured mail client can fail to
+    open silently on some platforms; that's not something a menu-icon
+    click should ever crash over)."""
+    entry = next((c for c in CONTACT_LINKS if c[0] == key), None)
+    if entry is None:
+        return False
+    try:
+        return bool(webbrowser.open(entry[3]))
+    except Exception:
+        return False
+
+
 # ── Share message text ──────────────────────────────────────────────
 # Each share is triggered from a different moment in the game (a win,
 # a badge unlock) and should say something specific to that moment

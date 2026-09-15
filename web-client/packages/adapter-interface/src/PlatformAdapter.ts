@@ -45,6 +45,16 @@ export interface PlatformAdapter {
    * identity-key docstring for what that limit means in practice. */
   getPlayerId(): Promise<string>;
   getDisplayName(): Promise<string>;
+  /** Persists a new display name for this device/session, overriding
+   * whatever getDisplayName() would otherwise return. Added for
+   * GameConfigScene.ts's "Your Name" field (Part C/D of the local-
+   * multiplayer-parity task) -- the first place in this codebase that
+   * lets a player type a name rather than only reading one back.
+   * Every adapter must implement this, even a minimal in-memory
+   * stand-in (matches the rest of this interface's "real, typed,
+   * intentionally minimal for now" methods -- see this file's
+   * header). */
+  setDisplayName(name: string): Promise<void>;
   getAvatarUrl(): Promise<string | null>;
 
   /** Returns null for a platform with no stable identity to offer
@@ -64,4 +74,60 @@ export interface PlatformAdapter {
   onSuspend(cb: () => void): void;
 
   getWebSocketUrl(): string;
+
+  /**
+   * Client-local settings persistence (SettingsScene, Part C of the
+   * KADI_web_port_implementation_plan.md Settings task). Deliberately
+   * typed as a loose JSON-serializable bag rather than importing
+   * packages/renderer's own `SettingsValues` shape (layout/
+   * SettingsLayout.ts) -- this package sits BELOW renderer in the
+   * dependency graph (renderer depends on @kadi/adapter-interface,
+   * never the reverse; see this file's own header comment), so the
+   * concrete settings shape/defaults must stay a renderer-side
+   * concern. SettingsScene.ts is responsible for merging whatever
+   * partial bag comes back here over its own defaults (a fresh
+   * install, or a settings file predating a newly-added field, both
+   * legitimately return a partial or empty object).
+   *
+   * Mirrors core/settings_store.py's save_settings()/load_settings()
+   * one level up: same "one JSON blob, whole settings object at once"
+   * shape, but WHERE it's written is platform-specific (the PC file
+   * lives in a per-user app-data directory; WebAdapter's is
+   * localStorage -- see that file). Every future adapter
+   * (Discord/Telegram/WeChat) must implement both, even if only as a
+   * no-op/in-memory stand-in, same as the rest of this interface's
+   * intentionally-minimal-for-now methods (see this file's header).
+   */
+  getSettings(): Promise<Record<string, unknown> | null>;
+  saveSettings(settings: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Client-local PROGRESS persistence (ProfileScene, Part B of the
+   * KADI_web_port_implementation_plan.md §9 Profile task) -- stats,
+   * badges, cosmetics, undo tokens. Deliberately a SEPARATE pair of
+   * methods from getSettings()/saveSettings() above, not a shared
+   * blob: mirrors core/profile_store.py's own file being distinct
+   * from core/settings_store.py's (see that module's docstring --
+   * "Reset to Defaults" in Settings must never wipe someone's
+   * badges/stats, which is only guaranteed if they're genuinely
+   * separate storage, not two keys inside one object a future edit
+   * could accidentally clear together). Same loose-bag-of-JSON
+   * typing, for the same reason (this package sits below
+   * packages/renderer in the dependency graph -- see getSettings()'s
+   * docstring above); ProfileScene.ts owns the concrete `ProfileData`
+   * shape (packages/renderer/src/profileData.ts) and merges whatever
+   * partial/absent bag comes back here over its own defaults.
+   */
+  getProfile(): Promise<Record<string, unknown> | null>;
+  saveProfile(profile: Record<string, unknown>): Promise<void>;
 }
+
+// Re-exported from this file since this package's package.json points
+// its "main"/"types" at PlatformAdapter.ts specifically (see that
+// file) rather than a separate index.ts — MsomiStore.ts's contract
+// (Chuo/MSOMI local storage, Part B) is a sibling concern at the same
+// package level, not a submodule of PlatformAdapter itself, but needs
+// the same "renderer imports only this package, never a concrete
+// class" treatment. See MsomiStore.ts's own header for why it's a
+// separate interface rather than folded into PlatformAdapter above.
+export * from './MsomiStore.js';

@@ -1,8 +1,21 @@
 {
   "wins": {
-    "Alice": 29,
-    "Bob": 10,
-    "Carol": 2
+    "Alice": {
+      "name": "Alice",
+      "count": 38
+    },
+    "Bob": {
+      "name": "Bob",
+      "count": 11
+    },
+    "Carol": {
+      "name": "Carol",
+      "count": 2
+    },
+    "web:dd5787bc-0276-4aa1-8fca-534d031107b6": {
+      "name": "Player",
+      "count": 1
+    }
   },
   "recorded_game_ids": [
     "9a22351c-ca71-4a73-9c3b-a0bed7db3a89",
@@ -45,6 +58,17 @@
     "cbedee82-8d2b-4682-89d5-4a18da8348d4",
     "146728f8-cebb-4917-9aa9-bc723dc3e9db",
     "bade76ee-7d1a-4238-b59f-1fdb2b28c8af",
-    "b2b926ce-f401-4667-aa7e-b35b3fb749bc"
+    "b2b926ce-f401-4667-aa7e-b35b3fb749bc",
+    "d2330910-d49f-4347-b33b-be9e5727a8d9",
+    "5b6064df-94da-432f-bc8c-4d0bbad10053",
+    "f4bd557b-e472-4017-a14e-f98cce5c9e8e",
+    "521f30e2-8f1c-4f0d-a80b-d0adb3660b7c",
+    "8fa307c7-8f6a-48a0-bcb3-b16c6c19258a",
+    "d8e5746c-514c-4638-8069-68fe2b9e1228",
+    "158b79f8-6305-4ab2-bbd0-0410b3355fa8",
+    "9bb65888-acbc-4eb3-89e3-6e99f35f10d4",
+    "74b2acc5-5079-4a76-84e5-ca73efb74ec9",
+    "09c12fee-98bd-42a9-93ad-8a9b52eaf6eb",
+    "03129841-2fd0-4fdd-813a-bc8c7d3b3dde"
   ]
 }
